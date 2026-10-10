@@ -71,6 +71,39 @@ def normalize_color(color: str | None, look: str | None) -> str | None:
     return None
 
 
+def normalize_dose(raw: str | None) -> str | None:
+    """'25MG', '25 mg.', '1,000 IU' -> '25 mg', '1000 IU'. Anything it doesn't recognise is returned as printed."""
+    s = (raw or "").strip().rstrip(".")
+    if not s:
+        return None
+    m = re.fullmatch(r"([\d.,]+)\s*(mg|mcg|g|ml|iu|units?)", s, re.IGNORECASE)
+    if not m:
+        return s
+    number, unit = m.group(1).replace(",", ""), m.group(2).lower()
+    unit = {"iu": "IU", "ml": "mL", "unit": "units"}.get(unit, unit)
+    return f"{number} {unit}"
+
+
+# Salt and form words printed after the drug name. Dropped so the patient sees "Metformin", not "Metformin Hcl",
+# and so the openFDA lookup in label.py searches the plain generic name.
+SALT_WORDS = {
+    "hcl", "hydrochloride", "hbr", "hydrobromide", "cal", "calcium", "sodium", "na", "potassium", "k",
+    "tartrate", "succinate", "er", "xr", "sr", "dr", "ir", "besylate", "maleate", "mesylate", "fumarate",
+    "citrate", "sulfate", "phosphate", "acetate", "magnesium", "mg", "tabs", "tablets", "tablet", "tab",
+    "capsules", "capsule", "cap", "caps", "softgels", "softgel",
+}
+
+
+def normalize_name(raw: str) -> str:
+    """'METFORMIN HCL' -> 'Metformin'; 'ATORVASTATIN CAL' -> 'Atorvastatin'; 'Eliquis' stays 'Eliquis'.
+    Labels are often ALL CAPS, so all-caps names are title-cased; mixed case (brand names) is kept."""
+    words = " ".join((raw or "").split()).split(" ")
+    while len(words) > 1 and words[-1].lower().strip(".,") in SALT_WORDS:
+        words.pop()
+    name = " ".join(words)
+    return name.title() if name.isupper() else name
+
+
 def is_high_risk(name: str) -> bool:
     words = set(re.findall(r"[a-z]+", name.lower()))
     return bool(words & HIGH_RISK_WORDS)
@@ -92,14 +125,14 @@ def extract_schedule(images: list[bytes]) -> list[ExtractedMed]:
     meds: list[ExtractedMed] = []
     seen: set[str] = set()
     for m in out.medications:
-        name = (m.name or "").strip()
+        name = normalize_name(m.name or "")
         if not name or name.lower() in seen:
             continue
         seen.add(name.lower())
         times = sorted({t for t in (normalize_time(x) for x in m.times) if t})
         meds.append(ExtractedMed(
             name=name,
-            dose=(m.dose or "").strip() or None,
+            dose=normalize_dose(m.dose),
             times=times,
             purpose=(m.purpose or "").strip() or None,
             look=(m.look or "").strip() or None,

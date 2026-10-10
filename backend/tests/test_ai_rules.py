@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.ai.analyze import closing_line, rules_analysis, safe_reply  # noqa: E402
-from app.ai.extract import is_high_risk, normalize_color, normalize_time  # noqa: E402
+from app.ai.extract import is_high_risk, normalize_color, normalize_dose, normalize_name, normalize_time  # noqa: E402
 from app.contracts import MedBrief, PastCheckin  # noqa: E402
 
 MEDS = [MedBrief(id="med_a", name="Metoprolol"), MedBrief(id="med_b", name="Warfarin")]
@@ -104,3 +104,44 @@ def test_high_risk():
     assert is_high_risk("Warfarin Sodium")
     assert is_high_risk("Eliquis")
     assert not is_high_risk("Atorvastatin")
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("25MG", "25 mg"), ("25 mg.", "25 mg"), ("1,000 IU", "1000 IU"), ("5 mg", "5 mg"),
+    ("0.5mg", "0.5 mg"), ("100 UNITS", "100 units"), ("1 tablet", "1 tablet"), (None, None),
+])
+def test_normalize_dose(raw, expected):
+    assert normalize_dose(raw) == expected
+
+
+def test_normalize_name():
+    assert normalize_name("METOPROLOL") == "Metoprolol"
+    assert normalize_name("VITAMIN D") == "Vitamin D"
+    assert normalize_name("Eliquis") == "Eliquis"
+    assert normalize_name("METFORMIN HCL") == "Metformin"
+    assert normalize_name("ATORVASTATIN CAL") == "Atorvastatin"
+    assert normalize_name("Metoprolol Tartrate ER") == "Metoprolol"
+    assert normalize_name("WARFARIN SODIUM") == "Warfarin"
+    assert normalize_name("HCL") == "Hcl"   # never strips the whole name
+
+
+def test_gemini_retries_when_busy(monkeypatch):
+    from google.genai import errors
+
+    from app.ai import _gemini
+
+    calls = {"n": 0}
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise errors.ServerError(503, {"error": {"code": 503, "message": "busy", "status": "UNAVAILABLE"}})
+            return "ok"
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(_gemini, "client", lambda: FakeClient())
+    monkeypatch.setattr(_gemini, "RETRY_DELAYS", (0, 0))
+    assert _gemini._call(contents=["x"]) == "ok" and calls["n"] == 3

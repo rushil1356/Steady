@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from typing import TypeVar
 
 from pydantic import BaseModel
@@ -11,7 +12,7 @@ from ._env import env, log
 
 T = TypeVar("T", bound=BaseModel)
 
-DEFAULT_MODEL = "gemini-2.5-flash"  # override with GEMINI_MODEL in .env
+DEFAULT_MODEL = "gemini-3.8-flash"  # override with GEMINI_MODEL in .env
 
 _client = None
 
@@ -32,6 +33,25 @@ def model_name() -> str:
     return env("GEMINI_MODEL", DEFAULT_MODEL)
 
 
+RETRY_STATUS = {429, 500, 502, 503, 504}  # busy or rate-limited: worth another try
+RETRY_DELAYS = (1.5, 4.0)                  # seconds; 3 attempts in total, ~6 s worst case
+
+
+def _call(**kwargs):
+    """generate_content with a short retry when Gemini is busy ("503 high demand") or rate-limits us."""
+    from google.genai import errors
+
+    for attempt, delay in enumerate((*RETRY_DELAYS, None)):
+        try:
+            return client().models.generate_content(model=model_name(), **kwargs)
+        except errors.APIError as err:
+            if delay is None or getattr(err, "code", None) not in RETRY_STATUS:
+                raise
+            log.warning("Gemini %s (attempt %d), retrying in %.1fs", err.code, attempt + 1, delay)
+            time.sleep(delay)
+    raise RuntimeError("unreachable")
+
+
 def _strip_fences(text: str) -> str:
     text = (text or "").strip()
     match = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, re.S)
@@ -44,19 +64,13 @@ def generate_json(parts: list, schema: type[T], system: str, temperature: float 
 
     base = dict(system_instruction=system, temperature=temperature, response_mime_type="application/json")
     try:
-        resp = client().models.generate_content(
-            model=model_name(), contents=parts,
-            config=types.GenerateContentConfig(**base, response_schema=schema),
-        )
+        resp = _call(contents=parts, config=types.GenerateContentConfig(**base, response_schema=schema))
     except Exception as err:  # noqa: BLE001 - any SDK schema complaint
         if "schema" not in str(err).lower() and "default" not in str(err).lower():
             raise
         log.warning("Gemini rejected the response schema (%s); retrying without it", err)
         hint = f"\nReturn JSON matching this JSON Schema:\n{schema.model_json_schema()}"
-        resp = client().models.generate_content(
-            model=model_name(), contents=parts,
-            config=types.GenerateContentConfig(**{**base, "system_instruction": system + hint}),
-        )
+        resp = _call(contents=parts, config=types.GenerateContentConfig(**{**base, "system_instruction": system + hint}))
     return schema.model_validate_json(_strip_fences(resp.text))
 
 
@@ -65,10 +79,8 @@ def generate_text(parts: list, system: str, temperature: float = 0.7, search: bo
     from google.genai import types
 
     tools = [types.Tool(google_search=types.GoogleSearch())] if search else None
-    resp = client().models.generate_content(
-        model=model_name(), contents=parts,
-        config=types.GenerateContentConfig(system_instruction=system, temperature=temperature, tools=tools),
-    )
+    resp = _call(contents=parts,
+                 config=types.GenerateContentConfig(system_instruction=system, temperature=temperature, tools=tools))
     return (resp.text or "").strip()
 
 

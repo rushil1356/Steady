@@ -26,3 +26,11 @@ backend/static/audio/*
 Thumbs.db
 .vscode/
 .idea/
+
+# label photos can show real names and Rx numbers: only photos of the printed DEMO labels
+# (named demo-*.jpg) are committed
+backend/tests/fixtures/labels/*.jpg
+backend/tests/fixtures/labels/*.jpeg
+backend/tests/fixtures/labels/*.png
+backend/tests/fixtures/labels/*.heic
+!backend/tests/fixtures/labels/demo-*
