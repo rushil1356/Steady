@@ -1,0 +1,69 @@
+{
+ "_about": "Expected tier per sample check-in. history_symptoms = symptoms from earlier check-ins this week; lang = the patient's chosen language. Used by backend/tests/test_ai_analyze.py.",
+ "fine_1.txt": {
+  "tier": "green",
+  "history_symptoms": [],
+  "lang": "en"
+ },
+ "fine_2.txt": {
+  "tier": "green",
+  "history_symptoms": [],
+  "lang": "en"
+ },
+ "fine_3.txt": {
+  "tier": "green",
+  "history_symptoms": [],
+  "lang": "en"
+ },
+ "mild_1.txt": {
+  "tier": "green",
+  "history_symptoms": [],
+  "lang": "en"
+ },
+ "mild_2.txt": {
+  "tier": "green",
+  "history_symptoms": [],
+  "lang": "en"
+ },
+ "mild_3.txt": {
+  "tier": "green",
+  "history_symptoms": [],
+  "lang": "en"
+ },
+ "repeat_1.txt": {
+  "tier": "yellow",
+  "history_symptoms": [
+   "dizzy"
+  ],
+  "lang": "en"
+ },
+ "repeat_2.txt": {
+  "tier": "yellow",
+  "history_symptoms": [
+   "dizzy"
+  ],
+  "lang": "en"
+ },
+ "red_1.txt": {
+  "tier": "red",
+  "history_symptoms": [],
+  "lang": "en"
+ },
+ "red_2.txt": {
+  "tier": "red",
+  "history_symptoms": [],
+  "lang": "en"
+ },
+ "hindi_red.txt": {
+  "tier": "red",
+  "history_symptoms": [],
+  "lang": "hi"
+ },
+ "spanish_repeat.txt": {
+  "tier": "yellow",
+  "history_symptoms": [
+   "dizzy"
+  ],
+  "lang": "es"
+ }
+}

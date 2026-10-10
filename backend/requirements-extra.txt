@@ -1,0 +1,4 @@
+# Stretch-goal packages only (owner: Rushil). Not installed in CI.
+# Install with: pip install -r requirements-extra.txt
+# librosa
+# praat-parselmouth

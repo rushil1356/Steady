@@ -1,0 +1,30 @@
+{
+  "dose_confirmations": [
+    {
+      "med_id": "med_metoprolol",
+      "taken": true
+    },
+    {
+      "med_id": "med_warfarin",
+      "taken": true
+    }
+  ],
+  "symptoms": [
+    "dizzy",
+    "tired"
+  ],
+  "red_flags": [],
+  "orientation_ok": true,
+  "mood_score": 5.3,
+  "tone_note": "Slower and quieter than recent check-ins",
+  "suggested_tier": "yellow",
+  "transcript_en": "I took my medicine. I'm feeling a little dizzy and very tired.",
+  "why": [
+    "Dizziness mentioned again (also Tuesday)",
+    "Sounded slower and quieter than recent check-ins",
+    "Took both evening pills"
+  ],
+  "heard_audio": true,
+  "caregiver_summary": "Asha mentioned dizziness tonight and on Tuesday, and sounded more tired than usual. Asha took both evening pills.",
+  "patient_reply_en": "Thank you for telling me, Asha. Take it easy and rest well. Have a good evening."
+}

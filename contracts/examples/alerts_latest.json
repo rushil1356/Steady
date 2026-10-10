@@ -1,0 +1,20 @@
+{
+  "alert": {
+    "id": 9,
+    "tier": "yellow",
+    "title": "Dizziness mentioned twice this week",
+    "summary": "Asha mentioned dizziness tonight and on Tuesday, and sounded more tired than usual. Asha took both evening pills.",
+    "note": "Dizziness is listed as a common side effect of Metoprolol. Worth mentioning to the doctor.",
+    "created_at": "2026-10-09T20:04:00",
+    "sms_sent": true,
+    "why": [
+      "Dizziness mentioned again (also Tuesday)",
+      "Sounded slower and quieter than recent check-ins",
+      "Took both evening pills"
+    ],
+    "tone_note": "Slower and quieter than recent check-ins",
+    "checkin_id": 55
+  },
+  "latest_checkin_id": 55,
+  "updated_at": "2026-10-09T20:04:03"
+}

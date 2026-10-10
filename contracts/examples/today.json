@@ -1,0 +1,72 @@
+{
+  "patient": {
+    "name": "Asha",
+    "language": "hi"
+  },
+  "now": "2026-10-09T19:55:00",
+  "taken_count": 2,
+  "total_count": 4,
+  "doses": [
+    {
+      "dose_id": 101,
+      "med_id": "med_vitd",
+      "name": "Vitamin D",
+      "dose": "1000 IU",
+      "time": "08:00",
+      "look": "orange pill",
+      "color": "#E9A23B",
+      "status": "taken",
+      "level": 1,
+      "always_remind": false
+    },
+    {
+      "dose_id": 102,
+      "med_id": "med_atorvastatin",
+      "name": "Atorvastatin",
+      "dose": "20 mg",
+      "time": "08:00",
+      "look": "white pill",
+      "color": "#FFFFFF",
+      "status": "taken",
+      "level": 1,
+      "always_remind": false
+    },
+    {
+      "dose_id": 103,
+      "med_id": "med_metoprolol",
+      "name": "Metoprolol",
+      "dose": "25 mg",
+      "time": "20:00",
+      "look": "yellow pill",
+      "color": "#F2C94C",
+      "status": "upcoming",
+      "level": 1,
+      "always_remind": false
+    },
+    {
+      "dose_id": 104,
+      "med_id": "med_warfarin",
+      "name": "Warfarin",
+      "dose": "5 mg",
+      "time": "20:00",
+      "look": "pink pill",
+      "color": "#E8A0BF",
+      "status": "upcoming",
+      "level": 1,
+      "always_remind": true
+    }
+  ],
+  "next": {
+    "time": "20:00",
+    "dose_ids": [
+      103,
+      104
+    ],
+    "label": "Yellow pill and pink pill"
+  },
+  "thought": {
+    "text": "Small habits, kept every day, quietly become strength.",
+    "because": "uplifting thoughts"
+  },
+  "streak_days": 3
+}

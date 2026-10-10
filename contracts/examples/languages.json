@@ -1,0 +1,8 @@
+{
+  "languages": [
+    {"code": "en", "name": "English", "native_name": "English", "spoken": true},
+    {"code": "es", "name": "Spanish", "native_name": "Español", "spoken": true},
+    {"code": "hi", "name": "Hindi", "native_name": "हिन्दी", "spoken": true},
+    {"code": "gu", "name": "Gujarati", "native_name": "ગુજરાતી", "spoken": false}
+  ]
+}

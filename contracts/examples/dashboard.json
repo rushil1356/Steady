@@ -1,0 +1,127 @@
+{
+  "status": {
+    "tier": "yellow",
+    "headline": "Worth a check-in",
+    "updated_at": "2026-10-09T20:04:00"
+  },
+  "active_alert": {
+    "id": 9,
+    "tier": "yellow",
+    "title": "Dizziness mentioned twice this week",
+    "summary": "Asha mentioned dizziness tonight and on Tuesday, and sounded more tired than usual. Asha took both evening pills.",
+    "note": "Dizziness is listed as a common side effect of Metoprolol. Worth mentioning to the doctor.",
+    "created_at": "2026-10-09T20:04:00",
+    "sms_sent": true,
+    "why": [
+      "Dizziness mentioned again (also Tuesday)",
+      "Sounded slower and quieter than recent check-ins",
+      "Took both evening pills"
+    ],
+    "tone_note": "Slower and quieter than recent check-ins",
+    "checkin_id": 55
+  },
+  "kpis": {
+    "today_taken": 4,
+    "today_total": 4,
+    "on_time_pct_30d": 97,
+    "on_time_doses_30d": 116,
+    "doses_30d": 120,
+    "unprompted_this_week": 19,
+    "doses_this_week": 28,
+    "checkins_answered_14d": 14
+  },
+  "mood_14d": [
+    {
+      "date": "2026-10-07",
+      "score": 6.8
+    },
+    {
+      "date": "2026-10-08",
+      "score": 6.4
+    },
+    {
+      "date": "2026-10-09",
+      "score": 5.3
+    }
+  ],
+  "usual_range": [
+    7.0,
+    8.0
+  ],
+  "unprompted_by_week": [
+    {
+      "label": "Week 1",
+      "value": 6
+    },
+    {
+      "label": "Week 2",
+      "value": 11
+    },
+    {
+      "label": "Week 3",
+      "value": 15
+    },
+    {
+      "label": "This week",
+      "value": 19
+    }
+  ],
+  "calendar_30d": [
+    {
+      "date": "2026-10-08",
+      "status": "ontime"
+    },
+    {
+      "date": "2026-10-09",
+      "status": "ontime"
+    }
+  ],
+  "checkins": [
+    {
+      "id": 55,
+      "at": "2026-10-09T20:03:00",
+      "quote": "मैंने दवाई ले ली। थोड़ा चक्कर आ रहा है और बहुत थकान है।",
+      "quote_en": "I took my medicine. I'm feeling a little dizzy and very tired.",
+      "tier": "yellow",
+      "tag": "second mention of dizziness",
+      "symptoms": [
+        "dizzy",
+        "tired"
+      ],
+      "tone_note": "Slower and quieter than recent check-ins",
+      "why": [
+        "Dizziness mentioned again (also Tuesday)",
+        "Sounded slower and quieter than recent check-ins",
+        "Took both evening pills"
+      ],
+      "heard_audio": true
+    }
+  ],
+  "medications": [
+    {
+      "id": "med_metoprolol",
+      "name": "Metoprolol",
+      "dose": "25 mg",
+      "purpose": "Blood pressure",
+      "color": "#F2C94C",
+      "schedule": "Daily · 8:00 PM",
+      "level": 2,
+      "always_remind": false,
+      "independence": 64,
+      "spark_14d": [
+        40,
+        45,
+        52,
+        58,
+        64
+      ],
+      "last_taken": "2026-10-09T20:01:00"
+    }
+  ],
+  "interests": [
+    "uplifting thoughts",
+    "clean jokes",
+    "Hindi proverbs",
+    "cricket"
+  ]
+}

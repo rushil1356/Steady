@@ -1,0 +1,21 @@
+{
+  "patient": {
+    "full_name": "Asha Patel",
+    "preferred_name": "Asha",
+    "phone": "+15555550111",
+    "language": "hi",
+    "interests": [
+      "uplifting thoughts",
+      "clean jokes",
+      "Hindi proverbs",
+      "cricket"
+    ]
+  },
+  "caregiver": {
+    "name": "Ravi Patel",
+    "relationship": "Son",
+    "phone": "+15555550100"
+  },
+  "sharing_consent": true,
+  "setup_complete": true
+}

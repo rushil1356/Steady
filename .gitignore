@@ -1,0 +1,28 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.db
+backend/.cache/
+
+# node
+node_modules/
+dist/
+
+# generated audio (demo-audio/ IS committed)
+backend/static/audio/*
+!backend/static/audio/.gitkeep
+
+# os / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

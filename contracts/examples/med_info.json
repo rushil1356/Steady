@@ -1,0 +1,10 @@
+{
+  "med_name": "Metoprolol",
+  "what_for": "Lowers blood pressure, so your heart works less hard.",
+  "how_to_take": "One pill each evening, with a meal or right after eating. Take it at the same time each day. Don't stop taking it suddenly.",
+  "side_effects": "Feeling tired or dizzy, mostly at first. Cold hands or feet.",
+  "call_doctor_if": "You feel faint, your heartbeat feels very slow, you are very short of breath, or your ankles swell.",
+  "source": "FDA drug label via openFDA",
+  "source_url": "https://api.fda.gov/drug/label.json?search=openfda.generic_name:%22metoprolol%22&limit=1",
+  "spoken": null
+}

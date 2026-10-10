@@ -1,0 +1,39 @@
+{
+  "now": "2026-10-09T20:00:00",
+  "due": [
+    {
+      "dose_id": 103,
+      "med_id": "med_metoprolol",
+      "name": "Metoprolol",
+      "dose": "25 mg",
+      "purpose": "Blood pressure",
+      "look": "yellow pill",
+      "color": "#F2C94C",
+      "level": 1,
+      "always_remind": false,
+      "reminder": {
+        "text_en": "Asha, it's time for your blood pressure pill, the yellow one.",
+        "text_local": "आशा जी, आपकी ब्लड प्रेशर की गोली का समय हो गया है, पीली वाली।",
+        "lang": "hi",
+        "audio_url": null
+      }
+    },
+    {
+      "dose_id": 104,
+      "med_id": "med_warfarin",
+      "name": "Warfarin",
+      "dose": "5 mg",
+      "purpose": "Blood thinner",
+      "look": "pink pill",
+      "color": "#E8A0BF",
+      "level": 1,
+      "always_remind": true,
+      "reminder": {
+        "text_en": "Asha, it's time for your blood thinner pill, the pink one.",
+        "text_local": "आशा जी, आपकी खून पतला करने वाली गोली का समय हो गया है, गुलाबी वाली।",
+        "lang": "hi",
+        "audio_url": null
+      }
+    }
+  ]
+}

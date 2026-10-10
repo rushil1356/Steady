@@ -1,0 +1,8 @@
+{
+  "medications": [
+    {"name": "Metoprolol", "dose": "25 mg", "times": ["20:00"], "purpose": "Blood pressure", "look": "yellow pill", "color": "#F2C94C", "high_risk": false, "needs_review": false},
+    {"name": "Warfarin", "dose": "5 mg", "times": ["20:00"], "purpose": "Blood thinner", "look": "pink pill", "color": "#E8A0BF", "high_risk": true, "needs_review": false},
+    {"name": "Atorvastatin", "dose": "20 mg", "times": ["08:00"], "purpose": "Cholesterol", "look": "white pill", "color": "#FFFFFF", "high_risk": false, "needs_review": false},
+    {"name": "Vitamin D", "dose": "1000 IU", "times": ["08:00"], "purpose": "Supplement", "look": null, "color": null, "high_risk": false, "needs_review": true}
+  ]
+}
