@@ -29,9 +29,10 @@ def test_extracts_expected_schedule(run):
     from app.ai import extract_schedule
 
     expected = json.loads((FIXTURES / "expected.json").read_text())["medications"]
-    got = {m.name.lower(): m for m in extract_schedule([p.read_bytes() for p in PHOTOS])}
+    meds = extract_schedule([p.read_bytes() for p in PHOTOS])
     for want in expected:
-        med = got.get(want["name"].lower())
-        assert med, f"run {run}: missing {want['name']}; got {list(got)}"
+        # "Metoprolol" matches "Metoprolol Tartrate": labels often print the salt name too
+        med = next((m for m in meds if want["name"].lower() in m.name.lower()), None)
+        assert med, f"run {run}: missing {want['name']}; got {[m.name for m in meds]}"
         assert med.dose == want["dose"], f"run {run}: {want['name']} dose {med.dose!r}"
         assert med.times == want["times"], f"run {run}: {want['name']} times {med.times}"
