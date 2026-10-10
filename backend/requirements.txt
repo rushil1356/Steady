@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+pydantic-settings
+python-multipart
+python-dotenv
+httpx
+google-genai
+elevenlabs
+twilio
+imageio-ffmpeg
+pytest
+ruff
