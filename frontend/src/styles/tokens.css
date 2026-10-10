@@ -1,0 +1,19 @@
+@theme {
+  --color-slate: #0f172a;
+  --color-slate-soft: #334155;
+  --color-navy: #1e1b4b;
+  --color-indigo: #312e81;
+  --color-indigo-light: #e0e7ff;
+  --color-background: #f8fafc;
+  --color-line: #cbd5e1;
+  --color-green: #15803d;
+  --color-green-dark: #14532d;
+  --color-green-light: #dcfce7;
+  --color-amber: #ea580c;
+  --color-amber-dark: #9a3412;
+  --color-amber-light: #ffedd5;
+  --color-blue-light: #eef2ff;
+  --color-red: #b91c1c;
+  --shadow-card: 0 18px 50px rgba(15, 23, 42, 0.1);
+  --shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
