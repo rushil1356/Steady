@@ -145,3 +145,90 @@ def test_gemini_retries_when_busy(monkeypatch):
     monkeypatch.setattr(_gemini, "client", lambda: FakeClient())
     monkeypatch.setattr(_gemini, "RETRY_DELAYS", (0, 0))
     assert _gemini._call(contents=["x"]) == "ok" and calls["n"] == 3
+
+
+@pytest.mark.parametrize("text,flag", [
+    ("मैं आज बाथरूम में गिर गया था। पैर में दर्द है।", "a fall"),
+    ("मैं आज bathroom में गिर गई", "a fall"),
+    ("सीने में दर्द हो रहा है", "chest pain or tightness"),
+    ("Me caí en la cocina", "a fall"),
+    ("No puedo respirar bien", "trouble breathing"),
+])
+def test_native_red_flags_work_without_translation(text, flag):
+    # transcript_en == the original text: what happens when translation is down
+    a = rules_analysis(text, MEDS, [], "Asha", transcript_en=text)
+    assert a.suggested_tier == "red" and flag in a.red_flags
+
+
+def test_unreadable_answer_is_never_green():
+    a = rules_analysis("आज मौसम अच्छा है", MEDS, [], "Asha", transcript_en="आज मौसम अच्छा है", understood=False)
+    assert a.suggested_tier == "yellow" and "understand" in a.why[-1]
+
+
+def test_gemini_down_and_translation_down_hindi_fall_is_red(monkeypatch):
+    from app.ai import analyze as an
+
+    monkeypatch.setenv("USE_MOCKS", "0")
+    monkeypatch.setattr(an, "to_english", lambda text, lang: text)            # translation failed
+    def boom(*a, **k):
+        raise RuntimeError("quota")
+    monkeypatch.setattr(an._gemini, "generate_json", boom)                      # Gemini failed
+    fall = an.analyze_checkin("मैं गिर गई, पैर में दर्द है", MEDS, [], patient_name="Asha", lang="hi")
+    assert fall.suggested_tier == "red"
+    fine = an.analyze_checkin("आज मौसम अच्छा है", MEDS, [], patient_name="Asha", lang="hi")
+    assert fine.suggested_tier == "yellow"
+
+
+def test_daily_quota_skips_retries_and_uses_fallback_model(monkeypatch):
+    from google.genai import errors
+
+    from app.ai import _gemini
+
+    seen = []
+
+    class FakeModels:
+        def generate_content(self, model, **kwargs):
+            seen.append(model)
+            if model == "main":
+                raise errors.ClientError(429, {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
+                                                         "message": "quotaId: GenerateRequestsPerDayPerProjectPerModel"}})
+            return "ok"
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(_gemini, "client", lambda: FakeClient())
+    monkeypatch.setenv("GEMINI_MODEL", "main")
+    monkeypatch.setenv("GEMINI_FALLBACK_MODEL", "backup")
+    assert _gemini._call(contents=["x"]) == "ok"
+    assert seen == ["main", "backup"]          # no wasted retries on a daily quota
+
+
+def test_dedupe_red_flags():
+    from app.ai.analyze import _dedupe
+
+    assert _dedupe(["fall", "a fall", "A fall", "chest pain"]) == ["fall", "chest pain"]
+
+
+def test_gemini_ok_means_no_separate_translation_call(monkeypatch):
+    from app.ai import analyze as an
+
+    monkeypatch.setenv("USE_MOCKS", "0")
+    calls = {"to_english": 0}
+
+    def fake_to_english(text, lang):
+        calls["to_english"] += 1
+        return text
+
+    def fake_json(parts, schema, system, temperature=0.2):
+        return schema(dose_confirmations=[], symptoms=["pain"], red_flags=["fall"], orientation_ok=True,
+                      mood_score=3, tone_note=None, suggested_tier="red", transcript_en="I fell today.",
+                      why=["Reported a fall in the bathroom"], caregiver_summary="Asha fell today.",
+                      patient_reply_en="x")
+
+    monkeypatch.setattr(an, "to_english", fake_to_english)
+    monkeypatch.setattr(an._gemini, "generate_json", fake_json)
+    a = an.analyze_checkin("मैं आज गिर गई", MEDS, [], patient_name="Asha", lang="hi")
+    assert calls["to_english"] == 0
+    assert a.suggested_tier == "red" and a.red_flags == ["fall"]
+    assert a.why == ["Reported a fall in the bathroom"]
