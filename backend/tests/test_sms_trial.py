@@ -14,7 +14,7 @@ def _fake_twilio(calls, fail_first):
     class Messages:
         def create(self, **kw):
             calls.append(kw)
-            if fail_first and "from_" in kw:
+            if fail_first and not kw["body"].startswith("sms_"):
                 raise _Trial("Invalid template name. Trial accounts can only use predefined SMS templates.")
 
     class Client:
@@ -47,7 +47,7 @@ def test_trial_account_falls_back_to_a_template(monkeypatch):
     _setup(monkeypatch, calls, fail_first=True)
     assert sms.send_sms("+15550002222", "Steady: hello") is True
     assert len(calls) == 2
-    assert calls[1] == {"to": "+15550002222", "body": "sms_account_alerts"}
+    assert calls[1] == {"to": "+15550002222", "from_": "+15550001111", "body": "sms_account_alerts"}
 
 
 def test_other_errors_still_fail(monkeypatch):

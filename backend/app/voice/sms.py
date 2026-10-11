@@ -29,10 +29,10 @@ def send_sms(to: str, body: str) -> bool:
             if not _trial_blocked(err):
                 raise
         # New Twilio trial accounts can't write their own text or choose a sender: `body` must be the NAME of one of
-        # Twilio's predefined templates, sent without `from`. Upgrade the account for custom alert text.
+        # Twilio's predefined templates, sent from the number Twilio assigned to the verified recipient. Upgrade the account for custom alert text.
         template = env("TWILIO_TRIAL_TEMPLATE", "sms_account_alerts")
         log.warning("Twilio trial account: sending the predefined template %r instead of the custom alert text", template)
-        client.messages.create(to=to, body=template)
+        client.messages.create(to=to, from_=sender, body=template)
         return True
     except Exception:  # noqa: BLE001
         log.exception("Twilio SMS failed")
