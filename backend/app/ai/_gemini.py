@@ -36,20 +36,62 @@ def model_name() -> str:
 RETRY_STATUS = {429, 500, 502, 503, 504}  # busy or rate-limited: worth another try
 RETRY_DELAYS = (1.5, 4.0)                  # seconds; 3 attempts in total, ~6 s worst case
 
+_thinking_supported = True
+
+
+def thinking():
+    """Low thinking = much faster answers for our short, structured tasks. GEMINI_THINKING=off disables it;
+    if a model rejects the setting we drop it automatically (see _call)."""
+    from google.genai import types
+
+    level = env("GEMINI_THINKING", "low").lower()
+    if not _thinking_supported or level in {"off", "none", ""}:
+        return None
+    return types.ThinkingConfig(thinking_level=level)
+
+
+def _models() -> list[str]:
+    """The main model, then GEMINI_FALLBACK_MODEL (if set) for when the main one is out of quota or overloaded."""
+    fallback = env("GEMINI_FALLBACK_MODEL")
+    return [model_name()] + ([fallback] if fallback and fallback != model_name() else [])
+
+
+def _is_daily_quota(err) -> bool:
+    return getattr(err, "code", None) == 429 and "perday" in str(err).lower()
+
 
 def _call(**kwargs):
-    """generate_content with a short retry when Gemini is busy ("503 high demand") or rate-limits us."""
+    """generate_content with a short retry when Gemini is busy ("503 high demand") or rate-limits us.
+    A DAILY quota error isn't retried (it won't clear for hours): we move straight to the fallback model."""
+    global _thinking_supported
     from google.genai import errors
 
-    for attempt, delay in enumerate((*RETRY_DELAYS, None)):
-        try:
-            return client().models.generate_content(model=model_name(), **kwargs)
-        except errors.APIError as err:
-            if delay is None or getattr(err, "code", None) not in RETRY_STATUS:
-                raise
-            log.warning("Gemini %s (attempt %d), retrying in %.1fs", err.code, attempt + 1, delay)
-            time.sleep(delay)
-    raise RuntimeError("unreachable")
+    last: Exception | None = None
+    for model in _models():
+        for attempt, delay in enumerate((*RETRY_DELAYS, None)):
+            try:
+                return client().models.generate_content(model=model, **kwargs)
+            except errors.APIError as err:
+                last = err
+                code = getattr(err, "code", None)
+                config = kwargs.get("config")
+                if code == 400 and "thinking" in str(err).lower() and getattr(config, "thinking_config", None):
+                    log.warning("%s rejected the thinking setting; continuing without it", model)
+                    _thinking_supported = False
+                    kwargs["config"] = config.model_copy(update={"thinking_config": None})
+                    continue
+                if _is_daily_quota(err):
+                    log.error("Gemini daily quota used up for %s", model)
+                    break
+                if code not in RETRY_STATUS:
+                    raise
+                if delay is None:
+                    break
+                log.warning("Gemini %s on %s (attempt %d), retrying in %.1fs", code, model, attempt + 1, delay)
+                time.sleep(delay)
+        if len(_models()) > 1:
+            log.warning("Switching from %s to the next model", model)
+    raise last if last else RuntimeError("Gemini call failed")
 
 
 def _strip_fences(text: str) -> str:
@@ -62,7 +104,8 @@ def generate_json(parts: list, schema: type[T], system: str, temperature: float 
     """Ask for JSON matching `schema`. Falls back to prompt-only JSON if the SDK rejects the schema."""
     from google.genai import types
 
-    base = dict(system_instruction=system, temperature=temperature, response_mime_type="application/json")
+    base = dict(system_instruction=system, temperature=temperature, response_mime_type="application/json",
+                thinking_config=thinking())
     try:
         resp = _call(contents=parts, config=types.GenerateContentConfig(**base, response_schema=schema))
     except Exception as err:  # noqa: BLE001 - any SDK schema complaint
@@ -80,7 +123,8 @@ def generate_text(parts: list, system: str, temperature: float = 0.7, search: bo
 
     tools = [types.Tool(google_search=types.GoogleSearch())] if search else None
     resp = _call(contents=parts,
-                 config=types.GenerateContentConfig(system_instruction=system, temperature=temperature, tools=tools))
+                 config=types.GenerateContentConfig(system_instruction=system, temperature=temperature, tools=tools,
+                                                    thinking_config=thinking()))
     return (resp.text or "").strip()
 
 

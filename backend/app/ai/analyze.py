@@ -47,6 +47,27 @@ SYMPTOM_PATTERNS: list[tuple[str, str]] = [
     (r"lonely|alone all day", "lonely"),
 ]
 
+# The safety net also reads the patient's OWN words, so a red flag is caught even when Gemini and translation are
+# both down (quota, network). Add a language here before demoing it.
+NATIVE_RED_FLAGS: list[tuple[str, str]] = [
+    # Hindi
+    (r"गिर (गई|गया|गयी|गए|पड़)|गिरी|गिरा", "a fall"),
+    (r"(सीने|छाती) में (दर्द|जकड़|भारीपन|दबाव)", "chest pain or tightness"),
+    (r"(सांस|साँस) (नहीं|लेने में|फूल)", "trouble breathing"),
+    (r"बेहोश", "fainting"),
+    (r"(मैं )?(कहाँ|कहां) (हूँ|हूं)", "confusion about where they are"),
+    # Spanish
+    (r"me ca[ií]|me he ca[ií]do|una ca[ií]da", "a fall"),
+    (r"dolor (en|de) (el )?pecho|presi[oó]n en el pecho|pecho apretado", "chest pain or tightness"),
+    (r"no puedo respirar|me falta el aire|falta de aire", "trouble breathing"),
+    (r"me desmay", "fainting"),
+]
+NATIVE_SYMPTOMS: list[tuple[str, str]] = [
+    (r"चक्कर|mare[oa]d?", "dizzy"),
+    (r"थकान|थका|थकी|cansad", "tired"),
+    (r"दर्द|dolor", "pain"),
+]
+
 MISSED_DOSE = re.compile(r"(forgot|didn'?t take|skipped|missed|haven'?t taken).{0,20}(pill|medicine|tablet|dose|it|them)", re.I)
 TOOK_ALL = re.compile(r"\b(took|taken|had) (them|my pills|my medicines?|all|both|everything)\b", re.I)
 
@@ -89,24 +110,42 @@ def safe_reply(reply: str | None, tier: str, patient_name: str, part_of_day: str
     return reply
 
 
-def _keyword_scan(text: str) -> tuple[list[str], list[str]]:
-    t = text.lower()
+def _dedupe(items: list[str]) -> list[str]:
+    """Keep order, drop repeats that differ only by case or a leading article: 'a fall' == 'fall' == 'A fall'."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        key = re.sub(r"^(a|an|the)\s+", "", item.strip().lower())
+        if key and key not in seen:
+            seen.add(key)
+            out.append(item.strip())
+    return out
+
+
+def _keyword_scan(text: str, original: str = "") -> tuple[list[str], list[str]]:
+    """English patterns on the English text, plus native-language patterns on the patient's own words."""
+    t, o = text.lower(), (original or "").lower()
     reds = [label for pattern, label in RED_FLAG_PATTERNS if re.search(pattern, t)]
+    reds += [label for pattern, label in NATIVE_RED_FLAGS if o and re.search(pattern, o) and label not in reds]
     symptoms = [label for pattern, label in SYMPTOM_PATTERNS if re.search(pattern, t)]
+    symptoms += [label for pattern, label in NATIVE_SYMPTOMS if o and re.search(pattern, o) and label not in symptoms]
     return reds, symptoms
 
 
 def rules_analysis(transcript: str, meds: list[MedBrief], history: list[PastCheckin],
                    patient_name: str = "", part_of_day: str = "evening",
-                   transcript_en: str | None = None) -> Analysis:
-    """Deterministic keyword analysis on the English text. The fallback, and the safety net under Gemini."""
+                   transcript_en: str | None = None, understood: bool = True) -> Analysis:
+    """Deterministic keyword analysis. The fallback, and the safety net under Gemini.
+    understood=False means nobody could read the answer (non-English, and translation + Gemini both failed):
+    then the tier is at least yellow, so the caregiver takes a look instead of Steady guessing "fine"."""
     english = (transcript_en or transcript).strip()
-    reds, symptoms = _keyword_scan(english)
+    reds, symptoms = _keyword_scan(english, transcript)
     earlier = {s for c in history for s in c.symptoms}
     repeated = [s for s in symptoms if s in earlier]
     missed = bool(MISSED_DOSE.search(english))
 
-    tier: Literal["green", "yellow", "red"] = "red" if reds else ("yellow" if repeated or missed else "green")
+    tier: Literal["green", "yellow", "red"] = "red" if reds else (
+        "yellow" if repeated or missed or not understood else "green")
     confirmations = [DoseConfirmation(med_id=m.id, taken=True) for m in meds] if TOOK_ALL.search(english) else []
 
     who = (patient_name or "").strip() or "The patient"
@@ -119,6 +158,8 @@ def rules_analysis(transcript: str, meds: list[MedBrief], history: list[PastChec
     why += [f"{s.capitalize()} came up again (also earlier this week)" for s in repeated]
     if missed:
         why.append("Mentioned a missed dose")
+    if not understood and not reds:
+        why.append("Steady couldn't fully understand this check-in; worth a quick call")
 
     return Analysis(
         dose_confirmations=confirmations,
@@ -178,8 +219,9 @@ def analyze_checkin(transcript: str, meds: list[MedBrief], history: list[PastChe
     if use_mocks():
         return Analysis(**load_example("analysis"))
 
-    english = to_english(transcript, lang)  # safety net runs on English
-    base = rules_analysis(transcript, meds, history, patient_name, part_of_day, transcript_en=english)
+    # The safety net first runs on the patient's own words (English + native-language patterns), with no extra API
+    # call. Gemini returns transcript_en in the same response, so we only translate separately if Gemini fails.
+    base = rules_analysis(transcript, meds, history, patient_name, part_of_day, transcript_en=transcript)
     if not transcript.strip():
         return base
 
@@ -194,13 +236,18 @@ def analyze_checkin(transcript: str, meds: list[MedBrief], history: list[PastChe
         out = _gemini.generate_json(parts, _Out, system, temperature=0.2)
     except Exception:  # noqa: BLE001
         log.exception("analyze_checkin: Gemini failed, using keyword analysis")
-        return base
+        if lang == "en":
+            return base
+        english = to_english(transcript, lang)
+        understood = english.strip() != transcript.strip()   # False: translation failed too, nobody can read it
+        return rules_analysis(transcript, meds, history, patient_name, part_of_day,
+                              transcript_en=english, understood=understood)
 
-    # Run the keyword net on Gemini's English too, in case to_english failed and returned the original.
-    model_reds, _ = _keyword_scan(out.transcript_en or "")
+    # Run the keyword net on Gemini's English too (catches English red-flag phrasing of a non-English answer).
+    model_reds, model_symptoms = _keyword_scan(out.transcript_en or "", transcript)
     valid_ids = {m.id for m in meds}
-    red_flags = list(dict.fromkeys([*base.red_flags, *model_reds, *(r.strip() for r in out.red_flags if r.strip())]))
-    symptoms = list(dict.fromkeys([*(s.strip().lower() for s in out.symptoms if s.strip()), *base.symptoms]))
+    red_flags = _dedupe([*(r.strip() for r in out.red_flags if r.strip()), *base.red_flags, *model_reds])
+    symptoms = _dedupe([*(s.strip().lower() for s in out.symptoms if s.strip()), *base.symptoms, *model_symptoms])
 
     tier = max(out.suggested_tier, base.suggested_tier, key=TIER_RANK.__getitem__)
     if red_flags:
@@ -215,8 +262,9 @@ def analyze_checkin(transcript: str, meds: list[MedBrief], history: list[PastChe
         mood_score=round(min(10.0, max(0.0, out.mood_score)), 1),
         tone_note=(out.tone_note or None) if part is not None else None,
         suggested_tier=tier,
-        transcript_en=(out.transcript_en or english or None),
-        why=list(dict.fromkeys([*base.why, *(w.strip() for w in out.why if w.strip())]))[:3],
+        transcript_en=(out.transcript_en or transcript or None),
+        # Gemini's reasons are specific ("Reported a fall in the bathroom"); keyword reasons only fill gaps.
+        why=(_dedupe([w.strip() for w in out.why if w.strip()]) or base.why)[:3],
         heard_audio=part is not None,
         caregiver_summary=out.caregiver_summary.strip() or base.caregiver_summary,
         patient_reply_en=safe_reply(out.patient_reply_en, tier, patient_name, part_of_day, caregiver_name),
