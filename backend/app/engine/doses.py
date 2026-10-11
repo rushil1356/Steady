@@ -59,7 +59,7 @@ def ensure_today(session: Session, now: datetime | None = None):
     ).all()
 
     for dose in doses:
-        if dose.status in ("taken", "missed"):
+        if dose.status == "taken":  # only "taken" is a real event; due/missed follow the (demo) clock
             continue
 
         if now >= dose.scheduled_at + timedelta(hours=2):

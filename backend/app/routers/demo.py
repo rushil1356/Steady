@@ -1,17 +1,17 @@
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
+from sqlmodel import Session, select
 
-from app import ai, clock, mocks, voice
+from app import ai, care_store, clock, voice
 from app.contracts import (
     DemoClockRequest,
     DemoClockResponse,
     DueDose,
     OkResponse,
 )
-from app.db import get_session
+from app.db import get_session, sync_meds_to_care_store
 from app.engine.doses import ensure_today
-from app.models import MedicationDB, ProfileDB
+from app.models import DoseDB, MedicationDB
 
 router = APIRouter(prefix="/api")
 
@@ -30,14 +30,17 @@ def set_clock(
         )
 
     doses = ensure_today(session, current)
-    profile = session.get(ProfileDB, 1)
 
-    patient_name = (
-        profile.patient_preferred_name if profile else ""
-    )
-    language = (
-        profile.patient_language if profile else "en"
-    )
+    # Demo only: jumping the clock forward shouldn't make the patient look like they missed this morning's pills.
+    # Doses already past their window when you jump are treated as taken on their own (unprompted).
+    for dose in doses:
+        if dose.status == "missed":
+            dose.status, dose.prompted, dose.confirmed_at = "taken", False, dose.scheduled_at
+            session.add(dose)
+    session.commit()
+    patient = care_store.profile().patient
+    patient_name = patient.preferred_name
+    language = patient.language
 
     due = []
 
@@ -85,11 +88,25 @@ def set_clock(
 
 
 @router.post("/demo/two-weeks-later", response_model=OkResponse)
-def two_weeks_later():
-    return OkResponse.model_validate(mocks.load("ok"))
+def two_weeks_later(session: Session = Depends(get_session)):
+    """The faded state: habits formed, so most medicines are silent (level 3). High-risk ones always remind."""
+    for med in session.exec(select(MedicationDB)).all():
+        med.level, med.streak = (1, 0) if med.always_remind else (3, 14)
+        session.add(med)
+    session.commit()
+    return OkResponse(ok=True)
 
 
 @router.post("/demo/reset", response_model=OkResponse)
-def reset_clock():
+def reset_clock(session: Session = Depends(get_session)):
+    """Back to the start: real clock, today's doses cleared, reminders back to level 1, no check-ins or alerts."""
     clock.reset()
+    for dose in session.exec(select(DoseDB)).all():
+        session.delete(dose)
+    for med in session.exec(select(MedicationDB)).all():
+        med.level, med.streak = 1, 0
+        session.add(med)
+    session.commit()
+    care_store.reset()
+    sync_meds_to_care_store(session)
     return OkResponse(ok=True)

@@ -32,13 +32,10 @@ def to_profile(row: ProfileDB) -> Profile:
 
 
 @router.get("/profile", response_model=Profile)
-def get_profile(session: Session = Depends(get_session)):
-    row = session.get(ProfileDB, 1)
-
-    if row is None:
-        return care_store.profile()
-
-    return to_profile(row)
+def get_profile():
+    # care_store is the single place the profile is read from (check-ins, reminders, language changes all use
+    # it); the ProfileDB row is kept in sync on every write below.
+    return care_store.profile()
 
 
 @router.put("/profile", response_model=Profile)

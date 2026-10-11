@@ -8,14 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from sqlmodel import Session, select
 
-from app import ai
+from app import ai, care_store
 from app.contracts import (
     ConfirmRequest,
     ConfirmResponse,
     ExtractResponse,
     LanguagesResponse,
 )
-from app.db import get_session
+from app.db import get_session, sync_meds_to_care_store
 from app.models import MedicationDB, PatientDB, ProfileDB
 
 router = APIRouter(prefix="/api")
@@ -46,11 +46,8 @@ def confirm(
 ):
     profile = session.get(ProfileDB, 1)
 
-    if profile is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Create a profile before adding medications",
-        )
+    if profile is None:  # seed_if_empty normally creates it; never block the caregiver here
+        profile = ProfileDB(id=1)
 
     if body.language is not None:
         if not ai.is_supported(body.language):
@@ -114,6 +111,10 @@ def confirm(
 
     session.add(profile)
     session.commit()
+
+    if body.language is not None:
+        care_store.update_patient(language=body.language)
+    sync_meds_to_care_store(session)  # check-ins and "Know more" now know the new medicines
 
     return ConfirmResponse(
         ok=True,
