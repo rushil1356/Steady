@@ -11,7 +11,7 @@ import Language from "./Language";
 function WaitingForSetup() {
   return (
     <main className="flex min-h-[80dvh] flex-col items-center justify-center gap-4 px-6 text-center">
-      <span className="text-6xl" aria-hidden>🌿</span>
+      <img src="/steady-logo.png" alt="" className="w-40" />
       <h1 className="text-3xl font-bold">Steady is almost ready</h1>
       <p className="text-xl text-slate-soft">Your caregiver is setting things up. This screen will change on its own.</p>
     </main>

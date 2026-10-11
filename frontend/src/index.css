@@ -5,5 +5,11 @@
   html { font-family: "Atkinson Hyperlegible", system-ui, sans-serif; font-size: 18px; }
   body { margin: 0; background: var(--color-background); color: var(--color-navy); }
   h1, h2, h3 { font-weight: 700; }
-  :focus-visible { outline: 4px solid #f59e0b; outline-offset: 3px; }
+  /* A warm serif for English headlines only (it has no Devanagari, so Hindi keeps the readable sans). */
+  h1:lang(en), .display:lang(en) { font-family: "Fraunces", "Atkinson Hyperlegible", Georgia, serif; letter-spacing: -0.01em; }
+  :focus-visible { outline: 4px solid #e4665a; outline-offset: 3px; }
 }
+
+@keyframes steady-bloom { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.steady-bloom-in { transform-box: fill-box; transform-origin: center; animation: steady-bloom 0.8s cubic-bezier(0.2, 1.4, 0.5, 1) both; }
+@media (prefers-reduced-motion: reduce) { .steady-bloom-in { animation: none; } }

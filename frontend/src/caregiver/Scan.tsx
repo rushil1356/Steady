@@ -141,7 +141,10 @@ export default function Scan() {
             onClick={() => input.current?.click()}
             className="flex min-h-40 w-full flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-indigo bg-blue-light text-indigo"
           >
-            <span className="text-5xl">📷</span>
+            <svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
             <span className="text-xl font-bold">{photos.length ? "Add another bottle" : "Open camera"}</span>
             <span className="text-base">One bottle per photo, label facing you</span>
           </button>
