@@ -1,0 +1,78 @@
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { api } from "../api/client";
+import { clearDue, saveDue } from "../patient/dueStore";
+import { unlockAudio } from "../audio";
+
+export default function DemoControls() {
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  if (params.get("demo") === "1") sessionStorage.setItem("steady.demo", "1");
+  if (sessionStorage.getItem("steady.demo") !== "1") return null;
+
+  async function run(label: string, action: () => Promise<void>) {
+    setBusy(true);
+    setMessage("");
+    try {
+      await action();
+    } catch (e) {
+      setMessage(`${label} failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const btn =
+    "min-h-14 rounded-xl border border-navy/30 bg-white px-3 text-base font-bold disabled:opacity-50";
+
+  return (
+    <div className="m-3 rounded-2xl border-2 border-dashed border-navy/40 p-3">
+      <div className="flex flex-wrap gap-2">
+        <button
+          className={btn}
+          disabled={busy}
+          onClick={() =>
+            run("Fast-forward", async () => {
+                unlockAudio();
+                const r = await api.demoClock("20:00");
+                const showable = r.due.filter((d) => d.level <= 2 || d.always_remind);
+                saveDue(showable);
+                if (showable.length > 0) navigate("/patient/reminder");
+                })
+          }
+        >
+          Fast-forward to 8 PM
+        </button>
+        <button
+          className={btn}
+          disabled={busy}
+          onClick={() =>
+            run("Two weeks later", async () => {
+              await api.twoWeeksLater();
+              window.location.reload();
+            })
+          }
+        >
+          Two weeks later
+        </button>
+        <button
+          className={btn}
+          disabled={busy}
+          onClick={() =>
+            run("Reset", async () => {
+              await api.reset();
+              clearDue();
+              window.location.assign("/patient");
+            })
+          }
+        >
+          Reset
+        </button>
+      </div>
+      {message ? <p className="mt-2 text-base text-red">{message}</p> : null}
+    </div>
+  );
+}

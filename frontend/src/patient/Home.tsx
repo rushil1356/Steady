@@ -48,15 +48,40 @@ function ProgressRing({ taken, total }: { taken: number; total: number }) {
   );
 }
 
+function MicIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-10 w-10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="9" y="3" width="6" height="12" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3" />
+    </svg>
+  );
+}
+
 export default function Home() {
   const [today, setToday] = useState<Today | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api
-      .today()
-      .then(setToday)
-      .catch((e: Error) => setError(e.message));
+    const load = () =>
+      api
+        .today()
+        .then(setToday)
+        .catch((e: Error) => setError(e.message));
+    load();
+    const id = window.setInterval(() => {
+      if (!document.hidden) load();
+    }, 30000);
+    return () => window.clearInterval(id);
   }, []);
 
   if (error) {
@@ -72,9 +97,9 @@ export default function Home() {
     : [];
 
   return (
-    <div className="flex min-h-dvh flex-col gap-5 px-5 pb-8 pt-6">
+    <div className="flex min-h-[calc(100dvh-5rem)] flex-col gap-5 px-5 pb-8 pt-6">
       <header>
-        <p className="text-sm font-bold uppercase tracking-widest text-slate-soft">
+        <p className="text-lg font-bold uppercase tracking-widest text-slate-soft">
           {new Date(today.now).toLocaleDateString(undefined, {
             weekday: "long",
             month: "long",
@@ -90,20 +115,17 @@ export default function Home() {
         <ProgressRing taken={today.taken_count} total={today.total_count} />
         <div>
           <p className="text-2xl font-bold">
-            {today.taken_count} of {today.total_count} taken
+            {today.taken_count} of {today.total_count} taken today
           </p>
           {today.streak_days ? (
-            <p className="mt-1 text-lg text-green-dark">{today.streak_days} days in a row</p>
+            <p className="mt-1 text-xl text-green-dark">{today.streak_days} days in a row</p>
           ) : null}
         </div>
       </section>
 
       {next ? (
-        <Link
-          to="/patient/reminder"
-          className="block rounded-3xl bg-white p-6 shadow-card"
-        >
-          <p className="text-sm font-bold uppercase tracking-widest text-slate-soft">
+        <div className="block rounded-3xl bg-white p-6 shadow-card">
+          <p className="text-lg font-bold uppercase tracking-widest text-slate-soft">
             Your next medicine · {formatTime(next.time)}
           </p>
           <div className="mt-3 flex items-center gap-2" aria-hidden="true">
@@ -116,10 +138,10 @@ export default function Home() {
             ))}
           </div>
           <p className="mt-3 text-3xl font-bold leading-tight">{next.label}</p>
-          <p className="mt-1 text-lg text-slate-soft">
+          <p className="mt-1 text-xl text-slate-soft">
             {nextDoses.map((d) => d.name).join(", ")}
           </p>
-        </Link>
+        </div>
       ) : (
         <div className="rounded-3xl bg-green-light p-6 text-xl font-bold text-green-dark">
           All done for today
@@ -128,41 +150,20 @@ export default function Home() {
 
       {today.thought ? (
         <section className="rounded-3xl bg-indigo-light p-5">
-          <p className="text-sm font-bold uppercase tracking-widest text-navy">
+          <p className="text-lg font-bold uppercase tracking-widest text-navy">
             A thought for today
           </p>
           <p className="mt-2 text-xl">{today.thought.text}</p>
         </section>
       ) : null}
 
-      <div className="mt-auto flex justify-center pt-4">
-        <Link
-          to="/patient/checkin"
-          aria-label="Talk to Steady"
-          className="relative flex h-40 w-40 items-center justify-center"
-        >
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 rounded-full border-2 border-indigo/30"
-          />
-          <span className="relative flex h-32 w-32 items-center justify-center rounded-full border-8 border-white bg-navy text-white shadow-card">
-            <svg
-              aria-hidden="true"
-              width="60"
-              height="60"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="9" y="3" width="6" height="12" rx="3" />
-              <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-            </svg>
-          </span>
-        </Link>
-      </div>
+      <Link
+        to="/patient/checkin"
+        aria-label="Talk to Steady"
+        className="mx-auto mt-auto flex h-24 w-24 items-center justify-center rounded-full bg-navy text-white shadow-card"
+      >
+        <MicIcon />
+      </Link>
     </div>
   );
 }
