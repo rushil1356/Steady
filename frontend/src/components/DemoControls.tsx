@@ -71,6 +71,20 @@ export default function DemoControls() {
         >
           Reset
         </button>
+        <button
+          className={btn}
+          disabled={busy}
+          onClick={() =>
+            run("Start fresh", async () => {
+              if (!window.confirm("Wipe the profile, medicines and check-ins, and set everything up again?")) return;
+              await api.startFresh();
+              clearDue();
+              window.location.assign("/patient");
+            })
+          }
+        >
+          Start fresh
+        </button>
       </div>
       {message ? <p className="mt-2 text-base text-red">{message}</p> : null}
     </div>

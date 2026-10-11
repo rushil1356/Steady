@@ -19,7 +19,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from app import mocks
 from app.contracts import MedBrief, PastCheckin, Profile
 
 DATA_FILE = Path(os.getenv("STEADY_DATA_FILE") or Path(__file__).resolve().parents[1] / "data" / "steady.json")
@@ -28,23 +27,32 @@ _lock = threading.RLock()
 _cache: dict[str, Any] | None = None
 
 
-def _default() -> dict[str, Any]:
-    """Start state: the demo profile and medicines from contracts/examples, no check-ins, no alerts."""
-    meds = [
-        MedBrief(id=f"med_{m['name'].lower().replace(' ', '_')}", name=m["name"], dose=m.get("dose"),
-                 purpose=m.get("purpose"), look=m.get("look"), high_risk=m.get("high_risk", False)).model_dump()
-        for m in mocks.load("extracted_meds")["medications"]
-    ]
-    # One earlier check-in, two days ago, so the demo's "dizzy again" check-in is recognised as a repeat (yellow).
+EMPTY_PROFILE = {
+    "patient": {"full_name": "", "preferred_name": "", "phone": None, "language": "en", "interests": []},
+    "caregiver": {"name": "", "relationship": None, "phone": ""},
+    "sharing_consent": False,
+    "setup_complete": False,
+}
+
+
+def _seeded_history() -> list[dict[str, Any]]:
+    """Demo history: one check-in two days ago mentioning dizziness, so a "dizzy again" check-in tonight is
+    recognised as a repeat (yellow). Shown in the caregiver feed like any other check-in."""
     earlier = (datetime.now() - timedelta(days=2)).replace(hour=20, minute=4, second=0, microsecond=0)
-    seeded_checkin = {
-        "id": 900, "at": earlier.isoformat(timespec="seconds"), "transcript": "मैंने दवाई ले ली। खाने के बाद थोड़ा चक्कर आया।",
-        "transcript_en": "I took my medicine. I felt a little dizzy after lunch.", "lang": "hi", "tier": "green",
+    return [{
+        "id": 900, "at": earlier.isoformat(timespec="seconds"),
+        "transcript": "I took my medicine. I felt a little dizzy after lunch.",
+        "transcript_en": "I took my medicine. I felt a little dizzy after lunch.", "lang": "en", "tier": "green",
         "symptoms": ["dizzy"], "red_flags": [], "mood_score": 6.8, "tone_note": None,
         "why": ["Mentioned feeling a little dizzy after lunch", "Took the evening medicines"], "heard_audio": False,
-        "summary": "Asha took the evening medicines and mentioned feeling a little dizzy after lunch.",
-    }
-    return {"profile": mocks.load("profile"), "meds": meds, "checkins": [seeded_checkin], "alerts": [],
+        "summary": "Took the evening medicines and mentioned feeling a little dizzy after lunch.",
+    }]
+
+
+def _default() -> dict[str, Any]:
+    """Start state: no profile yet (the caregiver sets it up), no medicines (the caregiver scans them),
+    plus the seeded demo history."""
+    return {"profile": copy.deepcopy(EMPTY_PROFILE), "meds": [], "checkins": _seeded_history(), "alerts": [],
             "next_id": 1000}
 
 
@@ -174,9 +182,13 @@ def open_alert() -> dict[str, Any] | None:
         return copy.deepcopy(max(open_, key=lambda a: (rank.get(a["tier"], 0), a["id"])))
 
 
-def reset() -> None:
-    """Back to the start state (demo reset)."""
+def reset(full: bool = False) -> None:
+    """Demo reset: clears check-ins and alerts (back to the seeded history).
+    full=True also clears the profile and medicines ("Start fresh": set everything up again from scratch)."""
     global _cache
     with _lock:
+        old = _load()
         _cache = _default()
+        if not full:
+            _cache["profile"], _cache["meds"] = old["profile"], old["meds"]
         _save()

@@ -31,6 +31,7 @@ export type DoseConfirm = components["schemas"]["DoseConfirmResponse"];
 export type Ok = components["schemas"]["OkResponse"];
 export type CheckinPrompt = components["schemas"]["CheckinPrompt"];
 export type CheckinResult = components["schemas"]["CheckinResult"];
+export type Profile = components["schemas"]["Profile"];
 export type CheckinTextBody = {
   text: string;
 };
@@ -46,6 +47,14 @@ export const api = {
   });
 },
   today: () => request<Today>("/api/patient/today"),
+  profile: () => request<Profile>("/api/profile"),
+  setLanguage: (language: string) =>
+    request<{ language: string }>("/api/patient/language", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language }),
+    }),
+  startFresh: () => request<Ok>("/api/demo/start-fresh", { method: "POST" }),
   medInfo: (medId: string) =>
   request<MedInfo>(`/api/meds/${encodeURIComponent(medId)}/info`),
   demoClock: (time: string) => request<DemoClock>("/api/demo/clock", json({ time })),

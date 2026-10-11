@@ -10,6 +10,7 @@ export type Profile = S["Profile"];
 export type ExtractedMed = S["ExtractedMed"];
 export type ConfirmMed = S["ConfirmMed"];
 export type Tier = "green" | "yellow" | "red";
+export type Today = S["Today"];
 
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
@@ -32,6 +33,14 @@ export const careApi = {
   alertsLatest: () => request<AlertsLatest>("/api/alerts/latest"),
   dashboard: () => request<Dashboard>("/api/caregiver/dashboard"),
   profile: () => request<Profile>("/api/profile"),
+  saveProfile: (p: Profile) =>
+    request<Profile>("/api/profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(p),
+    }),
+  today: () => request<Today>("/api/patient/today"),
+  startFresh: () => request<{ ok: boolean }>("/api/demo/start-fresh", { method: "POST" }),
   alertHandled: (id: number) => request<{ ok: boolean }>(`/api/alerts/${id}/handled`, { method: "POST" }),
   /** Label photos from the phone camera -> a draft schedule (not saved yet). */
   extract: (photos: File[]) => {

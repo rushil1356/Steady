@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
-from app import ai, care_store, clock, mocks
+from app import ai, care_store, clock
 from app.contracts import InterestsBody, LanguageBody, NextDose, PatientRef, Thought, Today, TodayDose
 from app.db import get_session
 from app.engine.doses import ensure_today
@@ -41,8 +41,10 @@ def today(session: Session = Depends(get_session)):
     now = clock.now()
     doses = ensure_today(session, now)
     meds = {m.id: m for m in session.exec(select(MedicationDB)).all()}
-    if not doses or not meds:
-        return Today.model_validate(mocks.load("today"))
+    patient = care_store.profile().patient
+    if not doses or not meds:  # nothing scheduled yet: an empty day, not example data
+        return Today(patient=PatientRef(name=patient.preferred_name, language=patient.language),
+                     now=now.isoformat(timespec="seconds"), taken_count=0, total_count=0, doses=[])
 
     rows = []
     for d in sorted(doses, key=lambda d: d.scheduled_at):  # noqa: B023
@@ -61,7 +63,6 @@ def today(session: Session = Depends(get_session)):
         label = " and ".join(r.look or r.name for r in group)
         next_dose = NextDose(time=pending[0].time, dose_ids=[r.dose_id for r in group], label=label[:1].upper() + label[1:])
 
-    patient = care_store.profile().patient
     line = ai.write_opener(patient.interests, care_store.part_of_day(now))
     thought = Thought(text=line, because=(patient.interests or ["uplifting thoughts"])[0]) if line else None
     streak = max((m.streak for m in meds.values()), default=0)
