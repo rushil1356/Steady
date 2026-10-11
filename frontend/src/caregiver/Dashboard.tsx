@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { careApi } from "./careApi";
 import "./Caregiver.css";
 import {
   LineChart,
@@ -13,28 +14,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const TABS = [
-  ["profile", "Profile"],
-  ["scan", "Scan"],
-  ["today", "Today"],
-  ["alerts", "Alerts"],
-] as const;
-
 type Dashboard = Awaited<ReturnType<typeof api.caregiverDashboard>>;
 type Checkin = Dashboard["checkins"][number];
-
-function useHashTab() {
-  const read = () => window.location.hash.slice(1) || "today";
-  const [tab, setTab] = useState(read);
-
-  useEffect(() => {
-    const onChange = () => setTab(read());
-    window.addEventListener("hashchange", onChange);
-    return () => window.removeEventListener("hashchange", onChange);
-  }, []);
-
-  return tab;
-}
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -95,9 +76,9 @@ function CheckinCard({ checkin }: { checkin: Checkin }) {
         </p>
       )}
 
-      {checkin.symptoms.length > 0 && (
+      {(checkin.symptoms ?? []).length > 0 && (
         <div className="cg-alert-factors">
-          {checkin.symptoms.map((symptom) => (
+          {(checkin.symptoms ?? []).map((symptom) => (
             <span className="cg-alert-factor" key={symptom}>
               {symptom}
             </span>
@@ -105,13 +86,13 @@ function CheckinCard({ checkin }: { checkin: Checkin }) {
         </div>
       )}
 
-      {checkin.why.length > 0 && (
+      {(checkin.why ?? []).length > 0 && (
         <details style={{ marginTop: 14 }}>
           <summary style={{ cursor: "pointer", fontWeight: 700 }}>
             How Steady understood it
           </summary>
           <ul style={{ paddingLeft: 20, marginTop: 8 }}>
-            {checkin.why.map((reason, index) => (
+            {(checkin.why ?? []).map((reason, index) => (
               <li key={index} className="cg-feed-note">
                 {reason}
               </li>
@@ -146,9 +127,9 @@ function AlertCenter({ data }: { data: Dashboard }) {
             Detected {formatDate(alert.created_at)}
           </p>
 
-          {alert.why.length > 0 && (
+          {(alert.why ?? []).length > 0 && (
             <div className="cg-alert-factors">
-              {alert.why.map((reason, index) => (
+              {(alert.why ?? []).map((reason, index) => (
                 <span className="cg-alert-factor" key={index}>
                   {reason}
                 </span>
@@ -191,7 +172,7 @@ function AlertCenter({ data }: { data: Dashboard }) {
     </section>
   );
 }
-function MoodTrendChart({ data }: { data: Dashboard }) {
+function MoodTrendChart({ data, name }: { data: Dashboard; name: string }) {
   const moodData = [...data.mood_14d]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((point) => ({
@@ -210,7 +191,7 @@ function MoodTrendChart({ data }: { data: Dashboard }) {
 
       <div className="cg-card">
         <p className="cg-subtitle">
-          Track changes in Asha's reported wellness over time.
+          Track changes in {name}'s reported wellness over time.
         </p>
 
         {moodData.length === 0 ? (
@@ -425,7 +406,7 @@ function MedicationIndependence({ data }: { data: Dashboard }) {
   );
 }
 
-function TodayDashboard({ data }: { data: Dashboard }) {
+function TodayDashboard({ data, name }: { data: Dashboard; name: string }) {
   const kpis = data.kpis;
   const progress =
     kpis.today_total > 0
@@ -436,10 +417,10 @@ function TodayDashboard({ data }: { data: Dashboard }) {
     <>
       <section className="cg-profile-banner">
         <div className="cg-profile-row">
-          <div className="cg-avatar" aria-hidden="true">A</div>
+          <div className="cg-avatar" aria-hidden="true">{(name[0] ?? "?").toUpperCase()}</div>
           <div>
             <p className="cg-eyebrow">Patient overview</p>
-            <h1 className="cg-title">Asha's Dashboard</h1>
+            <h1 className="cg-title">{name}'s Dashboard</h1>
             <StatusBadge tier={data.status.tier} />
           </div>
         </div>
@@ -537,128 +518,49 @@ function TodayDashboard({ data }: { data: Dashboard }) {
           </a>
         )}
       </section>
-<MoodTrendChart data={data} />
+<MoodTrendChart data={data} name={name} />
 <MedicationIndependence data={data} />
 <AlertCenter data={data} />
     </>
   );
 }
 
-export default function CaregiverApp() {
-  const tab = useHashTab();
+/** The caregiver "Home" tab: Aniketh's analytics (mood trend, independence, alert center, recent check-ins). */
+export default function DashboardHome() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState("Your patient");
+
+  useEffect(() => {
+    careApi.profile().then((p) => setName(p.patient.preferred_name || "Your patient")).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     let active = true;
-
-    const load = async () => {
-      try {
-        const result = await api.caregiverDashboard();
-        if (active) {
-          setData(result);
-          setError(null);
-        }
-      } catch (err) {
-        if (active) {
-          setError(
-            err instanceof Error ? err.message : "Unable to load dashboard"
-          );
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
+    const load = () =>
+      api
+        .caregiverDashboard()
+        .then((d) => active && (setData(d), setError(null)))
+        .catch((e: Error) => active && setError(e.message || "Unable to load dashboard"));
     void load();
-
+    const id = window.setInterval(() => {
+      if (!document.hidden) void load();
+    }, 10000);
     return () => {
       active = false;
+      window.clearInterval(id);
     };
-  }, [tab]);
+  }, []);
 
   return (
-    <div className="caregiver-app flex min-h-dvh flex-col">
-      <main className="cg-page w-full flex-1">
-        {loading && <p role="status">Loading caregiver dashboard...</p>}
-
-        {error && (
-          <div className="cg-alert cg-alert--red" role="alert">
-            Could not load dashboard: {error}
-          </div>
-        )}
-
-        {!loading && data && (
-          <>
-            {tab === "today" && <TodayDashboard data={data} />}
-
-            {tab === "alerts" && (
-              <>
-                <p className="cg-eyebrow">Patient safety</p>
-                <h1 className="cg-title">Alerts &amp; Check-ins</h1>
-
-                <AlertCenter data={data} />
-
-                <section className="cg-section">
-                  <h2 className="cg-section-title">
-                    Check-in History
-                  </h2>
-                  <div className="cg-feed">
-                    {data.checkins.map((checkin) => (
-                      <CheckinCard
-                        key={checkin.id}
-                        checkin={checkin}
-                      />
-                    ))}
-                  </div>
-                </section>
-              </>
-            )}
-
-            {tab === "scan" && (
-              <section className="cg-card">
-                <h1 className="cg-title">Scan Medication</h1>
-                <p className="cg-subtitle">
-                  Medication scanning will be added here.
-                </p>
-              </section>
-            )}
-
-            {tab === "profile" && (
-              <section className="cg-card">
-                <h1 className="cg-title">Patient Profile</h1>
-                <p className="cg-subtitle">
-                  Asha's caregiver overview
-                </p>
-
-                <h2 className="cg-card-title" style={{ marginTop: 20 }}>
-                  Interests
-                </h2>
-                <div className="cg-alert-factors">
-                  {data.interests.map((interest) => (
-                    <span className="cg-alert-factor" key={interest}>
-                      {interest}
-                    </span>
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
-        )}
-      </main>
-
-      <nav aria-label="Main" className="cg-nav">
-        {TABS.map(([id, label]) => (
-          <a
-            key={id}
-            href={`#${id}`}
-            aria-current={tab === id ? "page" : undefined}
-          >
-            {label}
-          </a>
-        ))}
-      </nav>
+    <div className="caregiver-app">
+      {error && (
+        <div className="cg-alert cg-alert--red" role="alert">
+          Could not load dashboard: {error}
+        </div>
+      )}
+      {!data && !error && <p role="status">Loading…</p>}
+      {data && <TodayDashboard data={data} name={name} />}
     </div>
   );
 }

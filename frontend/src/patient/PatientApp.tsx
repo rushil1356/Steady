@@ -33,6 +33,15 @@ export default function PatientApp() {
           if (!alive) return;
           setReady(p.setup_complete);
           setLang(p.patient.language);
+          // The caregiver's profile is the source of truth; keep the screens' language setting in step with it.
+          try {
+            if (localStorage.getItem("steady-language") !== p.patient.language) {
+              localStorage.setItem("steady-language", p.patient.language);
+              window.dispatchEvent(new Event("steady-language-change"));
+            }
+          } catch {
+            /* storage blocked: screens fall back to English */
+          }
         })
         .catch(() => alive && setReady(true));
     check();
