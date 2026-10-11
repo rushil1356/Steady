@@ -15,7 +15,7 @@ import copy
 import json
 import os
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +35,17 @@ def _default() -> dict[str, Any]:
                  purpose=m.get("purpose"), look=m.get("look"), high_risk=m.get("high_risk", False)).model_dump()
         for m in mocks.load("extracted_meds")["medications"]
     ]
-    return {"profile": mocks.load("profile"), "meds": meds, "checkins": [], "alerts": [], "next_id": 1000}
+    # One earlier check-in, two days ago, so the demo's "dizzy again" check-in is recognised as a repeat (yellow).
+    earlier = (datetime.now() - timedelta(days=2)).replace(hour=20, minute=4, second=0, microsecond=0)
+    seeded_checkin = {
+        "id": 900, "at": earlier.isoformat(timespec="seconds"), "transcript": "मैंने दवाई ले ली। खाने के बाद थोड़ा चक्कर आया।",
+        "transcript_en": "I took my medicine. I felt a little dizzy after lunch.", "lang": "hi", "tier": "green",
+        "symptoms": ["dizzy"], "red_flags": [], "mood_score": 6.8, "tone_note": None,
+        "why": ["Mentioned feeling a little dizzy after lunch", "Took the evening medicines"], "heard_audio": False,
+        "summary": "Asha took the evening medicines and mentioned feeling a little dizzy after lunch.",
+    }
+    return {"profile": mocks.load("profile"), "meds": meds, "checkins": [seeded_checkin], "alerts": [],
+            "next_id": 1000}
 
 
 def _load() -> dict[str, Any]:

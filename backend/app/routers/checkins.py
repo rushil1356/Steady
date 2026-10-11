@@ -43,7 +43,17 @@ async def _read_answer(request: Request) -> tuple[str, bytes | None, str]:
         raise HTTPException(422, 'Send multipart field "audio" or JSON {"text": "..."}') from err
 
 
-@router.post("/checkins", response_model=CheckinResult)
+# The body is either a recording or text, so it's read by hand; this tells /docs what to show.
+_BODY_DOCS = {"requestBody": {"required": True, "content": {
+    "application/json": {"schema": {"type": "object", "required": ["text"],
+                                    "properties": {"text": {"type": "string"}}},
+                         "example": {"text": "I fell in the kitchen and my hip hurts"}},
+    "multipart/form-data": {"schema": {"type": "object", "properties": {
+        "audio": {"type": "string", "format": "binary", "description": "the phone recording (webm/mp4/m4a/ogg)"}}}},
+}}}
+
+
+@router.post("/checkins", response_model=CheckinResult, openapi_extra=_BODY_DOCS)
 async def create_checkin(request: Request):
     text, audio, mime = await _read_answer(request)
     prof = care_store.profile()
