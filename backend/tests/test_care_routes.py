@@ -28,6 +28,7 @@ def test_profile_round_trip_and_consent_rule():
     p["patient"]["preferred_name"] = "Mr. Lee"
     assert client.put("/api/profile", json=p).json()["patient"]["preferred_name"] == "Mr. Lee"
     assert client.get("/api/profile").json()["patient"]["preferred_name"] == "Mr. Lee"
+    p["setup_complete"] = True
     p["sharing_consent"] = False
     assert client.put("/api/profile", json=p).status_code == 400
 

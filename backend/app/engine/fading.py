@@ -1,7 +1,7 @@
 
 from sqlmodel import Session, select
 
-from app.models import MedicationDB, PatientDB, DoseDB
+from app.models import MedicationDB, PatientDB, DoseDB, AlertDB
 from datetime import timedelta
 from app import clock
 
@@ -53,6 +53,7 @@ def independence(session: Session, medication_id: str):
 
     return round(unprompted / len(doses) * 100)
 
+
 def missed_dose(
     session: Session,
     medication: MedicationDB,
@@ -67,22 +68,44 @@ def missed_dose(
         medication.level = 1
 
     else:
-        cutoff = clock.now() - timedelta(days=7)
+        medication.level = max(medication.level - 1, 1)
 
-        missed = session.exec(
-            select(DoseDB).where(
-                DoseDB.medication_id == medication.id,
-                DoseDB.status == "missed",
-                DoseDB.scheduled_at >= cutoff,
-            )
-        ).all()
+    cutoff = clock.now() - timedelta(days=7)
 
-        if len(missed) >= 2:
-            medication.level = 1
-        else:
-            medication.level = max(
-                medication.level - 1, 1
+    missed = session.exec(
+        select(DoseDB).where(
+            DoseDB.medication_id == medication.id,
+            DoseDB.status == "missed",
+            DoseDB.scheduled_at >= cutoff,
+        )
+    ).all()
+
+    if len(missed) >= 2:
+        medication.level = 1
+
+        existing_alert = session.exec(
+            select(AlertDB).where(
+                AlertDB.patient_id == medication.patient_id,
+                AlertDB.title == "2 misses this week",
+                AlertDB.handled == False,
             )
+        ).first()
+
+        if existing_alert is None:
+            alert = AlertDB(
+                patient_id=medication.patient_id,
+                tier="yellow",
+                title="2 misses this week",
+                summary=(
+                    f"{medication.name} has been missed "
+                    "at least twice in the last 7 days."
+                ),
+                created_at=clock.now(),
+                sms_sent=False,
+                handled=False,
+            )
+
+            session.add(alert)
 
     session.add(medication)
     session.commit()

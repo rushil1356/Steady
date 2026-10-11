@@ -1,10 +1,11 @@
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlmodel import Session, select
-from app import clock
 
+from app import clock
 from app.models import MedicationDB, DoseDB
+from app.engine.fading import missed_dose
 
 
 def ensure_today(session: Session, now: datetime | None = None):
@@ -19,11 +20,15 @@ def ensure_today(session: Session, now: datetime | None = None):
     ).all()
 
     day_start = now.replace(
-        hour=0, minute=0, second=0, microsecond=0
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     day_end = day_start + timedelta(days=1)
 
+    # Generate today's scheduled doses
     for med in medications:
         for time_str in med.times:
             hour, minute = map(int, time_str.split(":"))
@@ -51,6 +56,7 @@ def ensure_today(session: Session, now: datetime | None = None):
 
     session.commit()
 
+    # Retrieve today's doses
     doses = session.exec(
         select(DoseDB).where(
             DoseDB.scheduled_at >= day_start,
@@ -58,12 +64,23 @@ def ensure_today(session: Session, now: datetime | None = None):
         )
     ).all()
 
+    # Update dose statuses
     for dose in doses:
         if dose.status in ("taken", "missed"):
             continue
 
         if now >= dose.scheduled_at + timedelta(hours=2):
             dose.status = "missed"
+            session.add(dose)
+            session.flush()
+
+            medication = session.get(
+                MedicationDB,
+                dose.medication_id,
+            )
+
+            if medication is not None:
+                missed_dose(session, medication)
 
         elif now >= dose.scheduled_at:
             dose.status = "due"
