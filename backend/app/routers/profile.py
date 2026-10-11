@@ -1,8 +1,10 @@
 
-from fastapi import APIRouter, Depends
+"""Patient and caregiver profile."""
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
-from app import mocks
+from app import care_store
 from app.contracts import Profile
 from app.db import get_session
 from app.models import ProfileDB
@@ -34,7 +36,7 @@ def get_profile(session: Session = Depends(get_session)):
     row = session.get(ProfileDB, 1)
 
     if row is None:
-        return Profile.model_validate(mocks.load("profile"))
+        return care_store.profile()
 
     return to_profile(row)
 
@@ -44,6 +46,13 @@ def put_profile(
     body: Profile,
     session: Session = Depends(get_session),
 ):
+    # Preserve Rushil's consent validation
+    if body.setup_complete and not body.sharing_consent:
+        raise HTTPException(
+            status_code=400,
+            detail="Setup can't finish until the patient agrees to share check-in notes.",
+        )
+
     row = session.get(ProfileDB, 1)
 
     if row is None:
@@ -65,5 +74,8 @@ def put_profile(
     session.add(row)
     session.commit()
     session.refresh(row)
+
+    # Keep Rushil's care_store updated as well
+    care_store.save_profile(body)
 
     return to_profile(row)

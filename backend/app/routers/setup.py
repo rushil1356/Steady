@@ -1,12 +1,14 @@
 
+"""Medication setup, label extraction, and languages."""
+
 import re
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi import File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from sqlmodel import Session, select
 
-from app import ai, mocks
+from app import ai
 from app.contracts import (
     ConfirmRequest,
     ConfirmResponse,
@@ -21,15 +23,19 @@ router = APIRouter(prefix="/api")
 
 @router.post("/setup/extract", response_model=ExtractResponse)
 async def extract(images: list[UploadFile] = File(...)):
-    return ExtractResponse.model_validate(
-        mocks.load("extracted_meds")
+    photos = [await image.read() for image in images[:6]]
+
+    return ExtractResponse(
+        medications=await run_in_threadpool(
+            ai.extract_schedule, photos
+        )
     )
 
 
 @router.get("/languages", response_model=LanguagesResponse)
 def languages():
-    return LanguagesResponse.model_validate(
-        mocks.load("languages")
+    return LanguagesResponse(
+        languages=ai.list_languages()
     )
 
 

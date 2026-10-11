@@ -34,3 +34,6 @@ backend/tests/fixtures/labels/*.jpeg
 backend/tests/fixtures/labels/*.png
 backend/tests/fixtures/labels/*.heic
 !backend/tests/fixtures/labels/demo-*
+
+# the care record (profile, check-ins, alerts) written at runtime
+backend/data/
