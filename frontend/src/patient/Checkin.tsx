@@ -34,7 +34,9 @@ export default function Checkin() {
   const timer = useRef<number | undefined>(undefined);
   const bottom = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [bubbles, captions.text, phase]);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth" }); // braces: an effect must not return a value
+  }, [bubbles, captions.text, phase]);
 
   useEffect(() => {
     let alive = true; // React runs this twice in development; only the live run may speak
