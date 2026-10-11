@@ -179,6 +179,7 @@ export default function Checkin() {
       const data = await api.submitCheckinAudio(recordedAudio);
       setResult(data);
       clearRecording();
+      void speak(data.reply); // play Steady's reply right away (the submit tap already unlocked audio)
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -202,8 +203,18 @@ export default function Checkin() {
     return (
       <main className="flex min-h-dvh flex-col gap-6 px-5 pb-8 pt-8">
         <h1 className="text-4xl font-bold">
-          Thank you for sharing!
+          {result.tier === "red" ? "Please get help now" : "Thank you for sharing!"}
         </h1>
+
+        {/* Red only: the reply tells them to call 911, so give them one tap to do it. Never show tiers otherwise. */}
+        {result.tier === "red" && (
+          <a
+            href="tel:911"
+            className="flex min-h-16 items-center justify-center rounded-2xl bg-red px-6 text-2xl font-bold text-white"
+          >
+            📞 Call 911
+          </a>
+        )}
 
         <section className="rounded-3xl bg-white p-6 shadow-card">
           <h2 className="mb-4 text-xl font-bold text-slate-soft">
@@ -242,6 +253,8 @@ export default function Checkin() {
       </main>
     );
   }
+
+  if (!prompt) return null;
 
   return (
     <main className="flex min-h-dvh flex-col gap-6 px-5 pb-8 pt-8">
