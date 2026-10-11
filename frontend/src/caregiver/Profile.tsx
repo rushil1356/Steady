@@ -106,7 +106,7 @@ export default function Profile({ onSaved }: { onSaved?: (p: ProfileT) => void }
         <Field label="Full name">
           <input className={input} value={p.patient.full_name} onChange={(e) => patient({ full_name: e.target.value })} />
         </Field>
-        <Field label="What should Steady call them?" hint="e.g. Asha, Nani, Mr. Lee">
+        <Field label="What should Steady call them?" hint="e.g. Asha, Mom, Mr. Lee">
           <input className={input} value={p.patient.preferred_name} onChange={(e) => patient({ preferred_name: e.target.value })} />
         </Field>
         <Field label="Their phone" hint="For the Call button on alerts">
