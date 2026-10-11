@@ -60,13 +60,15 @@ export default function PatientApp() {
       ) : (
         <>
           {pathname === "/patient" && (
-            <Link
-              to="/patient/language"
-              className="float-right mt-3 mr-4 rounded-full bg-white px-4 py-2 text-base font-bold text-indigo shadow-card"
-              aria-label="Change language"
-            >
-              {lang === "hi" ? "हिन्दी" : "English"} ▾
-            </Link>
+            <div className="flex justify-end px-4 pt-3">
+              <Link
+                to="/patient/language"
+                className="rounded-full bg-white px-4 py-2 text-base font-bold text-indigo shadow-card"
+                aria-label="Change language"
+              >
+                {lang === "hi" ? "हिन्दी" : "English"} ▾
+              </Link>
+            </div>
           )}
           <Routes>
             <Route index element={<Home />} />
