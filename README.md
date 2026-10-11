@@ -67,7 +67,7 @@ Tests: `cd backend && pytest`
 
 ## Demo
 
-Open `/patient` and `/caregiver` on two phones. In the demo box on the patient app: **Start fresh**, set up the profile and
+Open `/patient?demo=1` and `/caregiver` on two phones (the `?demo=1` is what shows the demo box). In the demo box on the patient app: **Start fresh**, set up the profile and
 medicines on the caregiver phone, tap **Load sample history** (adds two weeks of example history so the dashboard charts are populated and "dizzy again" is recognised as a repeat), **Fast-forward to next dose**, swipe to confirm, then say "I took my medicine, but I feel very
 dizzy." The caregiver phone gets the text and the alert appears within seconds. **Two weeks later** shows the reminders fading.
 
@@ -75,6 +75,7 @@ dizzy." The caregiver phone gets the text and the alert appears within seconds. 
 
 - One patient and one caregiver per install, no login. Multi-household pairing is the next step.
 - A new profile starts with an empty dashboard. The 30-day numbers and mood trend only appear after **Load sample history** in the demo box, and they are example data, not real use.
+- On Twilio's trial plan the alert SMS is a template message. The full alert text appears in the caregiver app's Alerts tab; a paid plan sends it by SMS.
 - Steady is a wellness companion, not a medical device. Its observations are not diagnoses.
 - Check-in wording and the medicine "Know more" notes are AI-generated and should be reviewed by a clinician before real use.
 
