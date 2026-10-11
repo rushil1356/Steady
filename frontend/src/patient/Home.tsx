@@ -81,6 +81,7 @@ function greeting(iso: string, language: Language) {
   return t.evening;
 }
 
+/** A small plant: one bud per dose today, and each dose taken opens into a flower. */
 function ProgressRing({
   taken,
   total,
@@ -90,13 +91,17 @@ function ProgressRing({
   total: number;
   language: Language;
 }) {
-  const r = 52;
-  const c = 2 * Math.PI * r;
-  const share = total ? taken / total : 0;
+  const count = Math.min(total, 8);
+  const open = Math.min(taken, count);
+  const buds = Array.from({ length: count }, (_, i) => {
+    const y = count === 1 ? 52 : 98 - (i * 66) / (count - 1);
+    const left = i % 2 === 0;
+    return { i, y, x: left ? 38 : 90, sx: 64 };
+  });
 
   return (
     <div
-      className="relative h-32 w-32 shrink-0"
+      className="relative h-36 w-32 shrink-0"
       role="img"
       aria-label={
         language === "hi"
@@ -104,31 +109,43 @@ function ProgressRing({
           : `${taken} of ${total} medicines taken today`
       }
     >
-      <svg viewBox="0 0 128 128" className="h-full w-full -rotate-90">
-        <circle
-          cx="64"
-          cy="64"
-          r={r}
+      <svg viewBox="0 0 128 144" className="h-full w-full" aria-hidden="true">
+        <ellipse cx="64" cy="134" rx="30" ry="6" fill="#dcd3c0" opacity="0.7" />
+        <path
+          d="M64 134 C 58 112, 72 96, 64 76 S 60 40, 64 18"
           fill="none"
-          strokeWidth="14"
-          className="stroke-line"
-        />
-        <circle
-          cx="64"
-          cy="64"
-          r={r}
-          fill="none"
-          strokeWidth="14"
+          stroke="#75a98a"
+          strokeWidth="4"
           strokeLinecap="round"
-          className="stroke-green"
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - share)}
         />
+        {buds.map(({ i, y, x }) => {
+          const done = i < open;
+          return (
+            <g key={i}>
+              <path
+                d={`M64 ${y + 14} Q ${(64 + x) / 2} ${y + 14} ${x} ${y}`}
+                fill="none"
+                stroke="#75a98a"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              {done ? (
+                <g transform={`translate(${x} ${y})`}>
+                  <g className="steady-bloom-in" style={{ animationDelay: `${i * 0.12}s` }}>
+                    {[0, 72, 144, 216, 288].map((angle) => (
+                      <ellipse key={angle} cx="0" cy="-8" rx="5.5" ry="9" fill="#e4665a" transform={`rotate(${angle})`} />
+                    ))}
+                    <circle r="4.5" fill="#f2b950" />
+                  </g>
+                </g>
+              ) : (
+                <ellipse cx={x} cy={y} rx="5" ry="8" fill="#f3efe4" stroke="#75a98a" strokeWidth="2.5" />
+              )}
+            </g>
+          );
+        })}
+        {count === 0 && <ellipse cx="64" cy="30" rx="8" ry="12" fill="#a9cdb7" />}
       </svg>
-
-      <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold">
-        {taken}/{total}
-      </div>
     </div>
   );
 }

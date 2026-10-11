@@ -62,6 +62,7 @@ export const api = {
   request<CheckinPrompt>("/api/checkins/prompt"),
   twoWeeksLater: () => request<Ok>("/api/demo/two-weeks-later", { method: "POST" }),
   reset: () => request<Ok>("/api/demo/reset", { method: "POST" }),
+  loadSample: () => request<Ok>("/api/demo/load-sample", { method: "POST" }),
   confirmDose: (doseId: number, prompted: boolean) =>
     request<DoseConfirm>(`/api/doses/${doseId}/confirm`, json({ prompted })),
   submitCheckin: (body: CheckinTextBody) =>

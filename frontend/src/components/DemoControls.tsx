@@ -37,14 +37,20 @@ export default function DemoControls() {
           onClick={() =>
             run("Fast-forward", async () => {
                 unlockAudio();
-                const r = await api.demoClock("20:00");
+                // Jump to whenever the next medicine is due (8 AM, 1 PM, 8 PM... whatever the caregiver scheduled).
+                const today = await api.today();
+                if (!today.next) {
+                  setMessage("No more medicines are due today. Tap Reset to start the day again.");
+                  return;
+                }
+                const r = await api.demoClock(today.next.time);
                 const showable = r.due.filter((d) => d.level <= 2 || d.always_remind);
                 saveDue(showable);
                 if (showable.length > 0) navigate("/patient/reminder");
                 })
           }
         >
-          Fast-forward to 8 PM
+          Fast-forward to next dose
         </button>
         <button
           className={btn}
@@ -70,6 +76,18 @@ export default function DemoControls() {
           }
         >
           Reset
+        </button>
+        <button
+          className={btn}
+          disabled={busy}
+          onClick={() =>
+            run("Load sample history", async () => {
+              await api.loadSample();
+              window.location.reload();
+            })
+          }
+        >
+          Load sample history
         </button>
         <button
           className={btn}

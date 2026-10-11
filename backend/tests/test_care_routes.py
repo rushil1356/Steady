@@ -60,6 +60,7 @@ def test_language_change_updates_profile():
 
 def test_checkin_text_creates_checkin_alert_and_shows_on_dashboard():
     setup_profile()
+    care_store.load_sample_history()
     before = client.get("/api/alerts/latest").json()
     assert before["alert"] is None and before["latest_checkin_id"] == 900      # the seeded earlier check-in
 
@@ -115,6 +116,8 @@ def test_scheduling_engine_hook():
 def test_seeded_history_makes_dizziness_a_repeat():
     from app.ai.analyze import rules_analysis
 
+    care_store.load_sample_history()
+
     a = rules_analysis("I feel dizzy again", care_store.meds(), care_store.history(), "Asha")
     assert a.suggested_tier == "yellow"
 
@@ -128,6 +131,7 @@ def test_reset_keeps_profile_start_fresh_clears_it():
     from app.contracts import MedBrief
 
     setup_profile()
+    care_store.load_sample_history()
     care_store.set_meds([MedBrief(id="med_x", name="Lisinopril")])
     client.post("/api/checkins", json={"text": "dizzy"})
     client.post("/api/demo/reset")

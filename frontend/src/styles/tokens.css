@@ -1,19 +1,23 @@
 @theme {
-  --color-slate: #0f172a;
-  --color-slate-soft: #334155;
-  --color-navy: #1e1b4b;
-  --color-indigo: #312e81;
-  --color-indigo-light: #e0e7ff;
-  --color-background: #f8fafc;
-  --color-line: #cbd5e1;
-  --color-green: #15803d;
-  --color-green-dark: #14532d;
-  --color-green-light: #dcfce7;
+  /* Steady palette: deep teal ink, warm paper, a coral accent from the logo's heart, sage for "done". */
+  --color-slate: #0d2f2e;
+  --color-slate-soft: #3d5957;
+  --color-navy: #0b3d3a;
+  --color-indigo: #0e6b63;
+  --color-indigo-light: #d6ece6;
+  --color-background: #fbf6ec;
+  --color-line: #dcd3c0;
+  --color-green: #2e7d4f;
+  --color-green-dark: #1d5a37;
+  --color-green-light: #e0f0e1;
   --color-amber: #ea580c;
   --color-amber-dark: #9a3412;
   --color-amber-light: #ffedd5;
-  --color-blue-light: #eef2ff;
+  --color-blue-light: #e6f2ee;
   --color-red: #b91c1c;
-  --shadow-card: 0 18px 50px rgba(15, 23, 42, 0.1);
-  --shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --color-coral: #e4665a;
+  --color-coral-dark: #b8402f;
+  --color-coral-light: #fde8e3;
+  --shadow-card: 0 14px 40px rgba(11, 61, 58, 0.10);
+  --shadow-soft: 0 6px 20px rgba(11, 61, 58, 0.08);
 }

@@ -1,13 +1,13 @@
 .caregiver-app {
-  --cg-slate: #0f172a;
-  --cg-soft: #334155;
-  --cg-navy: #1e1b4b;
-  --cg-indigo: #312e81;
-  --cg-indigo-light: #e0e7ff;
-  --cg-warm: #f8fafc;
-  --cg-line: #cbd5e1;
-  --cg-green: #15803d;
-  --cg-green-light: #dcfce7;
+  --cg-slate: #0d2f2e;
+  --cg-soft: #3d5957;
+  --cg-navy: #0b3d3a;
+  --cg-indigo: #0e6b63;
+  --cg-indigo-light: #d6ece6;
+  --cg-warm: #fbf6ec;
+  --cg-line: #dcd3c0;
+  --cg-green: #2e7d4f;
+  --cg-green-light: #e0f0e1;
   --cg-amber: #ea580c;
   --cg-amber-light: #ffedd5;
   --cg-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
@@ -150,7 +150,7 @@
 }
 
 .cg-badge--green {
-  color: #14532d;
+  color: #1d5a37;
   background: var(--cg-green-light);
 }
 
@@ -168,7 +168,7 @@
 
 .cg-progress {
   height: 12px;
-  background: #e2e8f0;
+  background: #e9e1d0;
   border-radius: 999px;
   overflow: hidden;
   margin-top: 14px;

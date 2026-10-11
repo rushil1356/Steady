@@ -49,11 +49,12 @@ def _seeded_history() -> list[dict[str, Any]]:
     }]
 
 
-def _default() -> dict[str, Any]:
-    """Start state: no profile yet (the caregiver sets it up), no medicines (the caregiver scans them),
-    plus the seeded demo history."""
-    return {"profile": copy.deepcopy(EMPTY_PROFILE), "meds": [], "checkins": _seeded_history(), "alerts": [],
-            "next_id": 1000}
+def _default(sample: bool = False) -> dict[str, Any]:
+    """Start state: no profile yet (the caregiver sets it up), no medicines (the caregiver scans them), and an
+    empty history. The demo history (an earlier dizzy check-in plus the dashboard's example charts) is only
+    present when sample=True, which the demo controls switch on."""
+    return {"profile": copy.deepcopy(EMPTY_PROFILE), "meds": [], "checkins": _seeded_history() if sample else [],
+            "alerts": [], "next_id": 1000, "sample_history": sample}
 
 
 def _load() -> dict[str, Any]:
@@ -63,6 +64,8 @@ def _load() -> dict[str, Any]:
             _cache = json.loads(DATA_FILE.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             _cache = _default()
+        if "sample_history" not in _cache:  # data file from an older version: it has the sample check-in iff sampled
+            _cache["sample_history"] = any(c.get("id") == 900 for c in _cache.get("checkins", []))
     return _cache
 
 
@@ -188,7 +191,22 @@ def reset(full: bool = False) -> None:
     global _cache
     with _lock:
         old = _load()
-        _cache = _default()
+        _cache = _default(sample=bool(old.get("sample_history")) and not full)
         if not full:
             _cache["profile"], _cache["meds"] = old["profile"], old["meds"]
+        _save()
+
+
+def sample_history() -> bool:
+    with _lock:
+        return bool(_load().get("sample_history"))
+
+
+def load_sample_history() -> None:
+    """Demo only: add the example history (dizzy check-in two days ago, example charts) to the dashboard."""
+    global _cache
+    with _lock:
+        old = _load()
+        _cache = _default(sample=True)
+        _cache["profile"], _cache["meds"] = old["profile"], old["meds"]
         _save()
