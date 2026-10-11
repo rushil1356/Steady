@@ -5,9 +5,57 @@ import { careApi, type ConfirmMed } from "./careApi";
 
 type Phase = "pick" | "reading" | "review" | "saving" | "saved";
 
-const timesText = (t: string[] | undefined) => (t ?? []).join(", ");
-const parseTimes = (s: string) =>
-  s.split(/[,\s]+/).map((x) => x.trim()).filter((x) => /^\d{1,2}:\d{2}$/.test(x)).map((x) => x.padStart(5, "0"));
+// Tap-to-pick dose times. "Other" accepts any time with the phone's own time picker.
+const SLOTS = [
+  { time: "08:00", label: "Morning", sub: "8 AM" },
+  { time: "13:00", label: "Afternoon", sub: "1 PM" },
+  { time: "20:00", label: "Evening", sub: "8 PM" },
+  { time: "22:00", label: "Bedtime", sub: "10 PM" },
+];
+
+// Backup for the stage: the 4 printed demo labels, in case the camera or Wi-Fi fails.
+const DEMO_MEDS: ConfirmMed[] = [
+  { name: "Metoprolol", dose: "25 mg", times: ["20:00"], purpose: "Blood pressure", look: "yellow pill", color: "#F2C94C", high_risk: false, needs_review: false, always_remind: false },
+  { name: "Warfarin", dose: "5 mg", times: ["20:00"], purpose: "Blood thinner", look: "pink pill", color: "#E8A0BF", high_risk: true, needs_review: false, always_remind: true },
+  { name: "Atorvastatin", dose: "20 mg", times: ["08:00"], purpose: "Cholesterol", look: "white pill", color: "#FFFFFF", high_risk: false, needs_review: false, always_remind: false },
+  { name: "Vitamin D", dose: "1000 IU", times: ["08:00"], purpose: "Supplement", look: "orange pill", color: "#E9A23B", high_risk: false, needs_review: false, always_remind: false },
+];
+
+const BLANK: ConfirmMed = { name: "", dose: null, times: [], high_risk: false, needs_review: false, always_remind: false };
+
+function TimePicker({ times, onChange }: { times: string[]; onChange: (t: string[]) => void }) {
+  const [other, setOther] = useState("");
+  const toggle = (t: string) => onChange(times.includes(t) ? times.filter((x) => x !== t) : [...times, t].sort());
+  const extra = times.filter((t) => !SLOTS.some((s) => s.time === t));
+  return (
+    <div>
+      <span className="text-sm font-bold text-slate-soft">When to take it</span>
+      <div className="mt-1 grid grid-cols-2 gap-2">
+        {SLOTS.map((s) => {
+          const on = times.includes(s.time);
+          return (
+            <button key={s.time} type="button" onClick={() => toggle(s.time)} aria-pressed={on}
+              className={`min-h-14 rounded-xl border-2 text-lg font-bold ${on ? "border-indigo bg-indigo-light text-navy" : "border-line bg-white text-slate-soft"}`}>
+              {s.label} <span className="text-sm font-normal">{s.sub}</span>
+            </button>
+          );
+        })}
+      </div>
+      {extra.map((t) => (
+        <button key={t} type="button" onClick={() => toggle(t)} className="mt-2 mr-2 min-h-12 rounded-full bg-indigo px-4 text-base font-bold text-white">
+          {t} ✕
+        </button>
+      ))}
+      <div className="mt-2 flex gap-2">
+        <input type="time" value={other} onChange={(e) => setOther(e.target.value)} aria-label="Other time" className="min-h-12 flex-1 rounded-xl border border-line px-3 text-lg" />
+        <button type="button" disabled={!other} onClick={() => { if (other && !times.includes(other)) onChange([...times, other].sort()); setOther(""); }}
+          className="min-h-12 rounded-xl border border-line bg-white px-4 text-base font-bold text-indigo disabled:opacity-40">
+          Add time
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Scan() {
   const input = useRef<HTMLInputElement>(null);
@@ -38,6 +86,11 @@ export default function Scan() {
     setMeds((list) => list.map((m, j) => (j === i ? { ...m, ...patch, needs_review: false } : m)));
 
   const confirm = async () => {
+    const noTime = meds.find((m) => m.name.trim() && !(m.times ?? []).length);
+    if (noTime) {
+      setError(`Pick when ${noTime.name} should be taken.`);
+      return;
+    }
     setPhase("saving");
     setError(null);
     try {
@@ -56,7 +109,10 @@ export default function Scan() {
       <section className="rounded-3xl bg-green-light p-6 text-green-dark">
         <p className="text-2xl font-bold">Schedule saved</p>
         <p className="mt-2 text-lg">Steady will remind at the right times, and ease off as the habit forms.</p>
-        <button onClick={reset} className="mt-4 min-h-14 w-full rounded-2xl bg-white text-lg font-bold text-navy">
+        <a href="#today" className="mt-4 flex min-h-14 w-full items-center justify-center rounded-2xl bg-navy text-lg font-bold text-white">
+          See today's schedule
+        </a>
+        <button onClick={reset} className="mt-2 min-h-14 w-full rounded-2xl bg-white text-lg font-bold text-navy">
           Scan more bottles
         </button>
       </section>
@@ -103,6 +159,14 @@ export default function Scan() {
           >
             {phase === "reading" ? "Reading the labels…" : `Read ${photos.length || ""} label${photos.length === 1 ? "" : "s"}`}
           </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => { setMeds([{ ...BLANK }]); setPhase("review"); }} className="min-h-14 rounded-2xl border border-line bg-white text-base font-bold text-indigo">
+              Add by hand
+            </button>
+            <button onClick={() => { setMeds(DEMO_MEDS.map((m) => ({ ...m }))); setPhase("review"); }} className="min-h-14 rounded-2xl border border-line bg-white text-base font-bold text-slate-soft">
+              Use demo medicines
+            </button>
+          </div>
         </>
       )}
 
@@ -122,16 +186,12 @@ export default function Scan() {
                   <input value={m.dose ?? ""} onChange={(e) => update(i, { dose: e.target.value || null })} className="mt-1 min-h-14 w-full rounded-xl border border-line px-3 text-lg" />
                 </label>
                 <label className="block">
-                  <span className="text-sm font-bold text-slate-soft">Times (24h)</span>
-                  <input
-                    defaultValue={timesText(m.times)}
-                    onBlur={(e) => update(i, { times: parseTimes(e.target.value) })}
-                    placeholder="08:00, 20:00"
-                    className="mt-1 min-h-14 w-full rounded-xl border border-line px-3 text-lg"
-                  />
+                  <span className="text-sm font-bold text-slate-soft">What it's for</span>
+                  <input value={m.purpose ?? ""} onChange={(e) => update(i, { purpose: e.target.value || null })} placeholder="e.g. Blood pressure" className="mt-1 min-h-14 w-full rounded-xl border border-line px-3 text-lg" />
                 </label>
               </div>
-              <p className="text-base text-slate-soft">{[m.purpose, m.look].filter(Boolean).join(" · ")}</p>
+              <TimePicker times={m.times ?? []} onChange={(t) => update(i, { times: t })} />
+              {m.look && <p className="text-base text-slate-soft">Looks like: {m.look}</p>}
               <label className="flex min-h-12 items-center gap-3 text-base">
                 <input type="checkbox" checked={!!m.always_remind} onChange={(e) => update(i, { always_remind: e.target.checked })} className="size-6" />
                 <span>
@@ -144,7 +204,7 @@ export default function Scan() {
             </article>
           ))}
           <button
-            onClick={() => setMeds((l) => [...l, { name: "", dose: null, times: ["08:00"], high_risk: false, needs_review: false, always_remind: false }])}
+            onClick={() => setMeds((l) => [...l, { ...BLANK }])}
             className="min-h-14 w-full rounded-2xl border border-line bg-white text-lg font-bold text-indigo"
           >
             + Add a medicine by hand

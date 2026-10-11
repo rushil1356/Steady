@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import Alerts from "./Alerts";
+import Profile from "./Profile";
 import Scan from "./Scan";
+import Today from "./Today";
+import { careApi } from "./careApi";
 
 const TABS = [
   ["profile", "Profile"],
@@ -22,10 +25,44 @@ function useHashTab() {
 
 export default function CaregiverApp() {
   const tab = useHashTab();
+  const [setupDone, setSetupDone] = useState<boolean | null>(null);
+
+  // A fresh install starts on Profile: nothing works until the caregiver has set up the patient.
+  useEffect(() => {
+    careApi
+      .profile()
+      .then((p) => {
+        setSetupDone(p.setup_complete);
+        if (!p.setup_complete) window.location.hash = "profile";
+      })
+      .catch(() => setSetupDone(true));
+  }, []);
+
+  const view =
+    tab === "profile" ? (
+      <Profile
+        onSaved={() => {
+          if (!setupDone) window.location.hash = "scan"; // next step of first-time setup
+          setSetupDone(true);
+        }}
+      />
+    ) : tab === "scan" ? (
+      <Scan />
+    ) : tab === "alerts" ? (
+      <Alerts />
+    ) : (
+      <Today />
+    );
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-[440px] flex-col">
       <main className="flex-1 p-6">
-        {tab === "alerts" ? <Alerts /> : tab === "scan" ? <Scan /> : <h1 className="text-3xl">Caregiver: {tab}</h1>}
+        {setupDone === false && tab !== "profile" && (
+          <a href="#profile" className="mb-4 block rounded-2xl bg-amber-light px-4 py-3 text-lg font-bold text-amber-dark">
+            Finish setting up the profile first →
+          </a>
+        )}
+        {view}
       </main>
       <nav aria-label="Main" className="sticky bottom-0 grid grid-cols-4 border-t border-line bg-white">
         {TABS.map(([id, label]) => (

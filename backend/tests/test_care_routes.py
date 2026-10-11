@@ -22,8 +22,28 @@ def fresh_store(tmp_path, monkeypatch):
 
 client = TestClient(app)
 
+PROFILE = {
+    "patient": {"full_name": "Asha Patel", "preferred_name": "Asha", "phone": "+15555550111", "language": "hi",
+                "interests": ["cricket"]},
+    "caregiver": {"name": "Ravi Patel", "relationship": "Son", "phone": "+15555550100"},
+    "sharing_consent": True,
+    "setup_complete": True,
+}
+
+
+def setup_profile():
+    assert client.put("/api/profile", json=PROFILE).status_code == 200
+
+
+def test_first_run_has_no_profile_and_no_medicines():
+    p = client.get("/api/profile").json()
+    assert p["setup_complete"] is False and p["patient"]["preferred_name"] == ""
+    assert p["patient"]["language"] == "en"
+    assert care_store.meds() == []
+
 
 def test_profile_round_trip_and_consent_rule():
+    setup_profile()
     p = client.get("/api/profile").json()
     p["patient"]["preferred_name"] = "Mr. Lee"
     assert client.put("/api/profile", json=p).json()["patient"]["preferred_name"] == "Mr. Lee"
@@ -33,11 +53,13 @@ def test_profile_round_trip_and_consent_rule():
 
 
 def test_language_change_updates_profile():
+    setup_profile()
     client.put("/api/patient/language", json={"language": "es"})
     assert client.get("/api/profile").json()["patient"]["language"] == "es"
 
 
 def test_checkin_text_creates_checkin_alert_and_shows_on_dashboard():
+    setup_profile()
     before = client.get("/api/alerts/latest").json()
     assert before["alert"] is None and before["latest_checkin_id"] == 900      # the seeded earlier check-in
 
@@ -69,6 +91,7 @@ def test_empty_answer_is_422():
 
 
 def test_no_alert_without_consent():
+    setup_profile()
     p = client.get("/api/profile").json()
     p["sharing_consent"], p["setup_complete"] = False, False
     client.put("/api/profile", json=p)
@@ -99,3 +122,17 @@ def test_seeded_history_makes_dizziness_a_repeat():
 def test_docs_show_checkin_body():
     body = app.openapi()["paths"]["/api/checkins"]["post"]["requestBody"]["content"]
     assert "application/json" in body and "multipart/form-data" in body
+
+
+def test_reset_keeps_profile_start_fresh_clears_it():
+    from app.contracts import MedBrief
+
+    setup_profile()
+    care_store.set_meds([MedBrief(id="med_x", name="Lisinopril")])
+    client.post("/api/checkins", json={"text": "dizzy"})
+    client.post("/api/demo/reset")
+    assert client.get("/api/profile").json()["patient"]["preferred_name"] == "Asha"
+    assert [c["id"] for c in care_store.checkins()] == [900]
+    client.post("/api/demo/start-fresh")
+    assert client.get("/api/profile").json()["setup_complete"] is False
+    assert care_store.meds() == []

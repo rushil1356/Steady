@@ -1,401 +1,239 @@
+// Patient check-in as a chat with Steady, in the patient's language.
+// Steady's lines on the left; the patient's words appear on the right AS THEY SPEAK (live captions), then
+// the exact transcript replaces them and Steady replies. Never shows tiers or alerts: the caregiver is told
+// silently. Only a red tier adds a "Call 911" button.
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  api,
-  type CheckinPrompt,
-  type CheckinResult,
-} from "../api/client";
+import { api, type CheckinPrompt, type CheckinResult } from "../api/client";
 import { speak, stopSpeaking, unlockAudio } from "../audio";
+import { useLiveCaptions } from "../lib/useLiveCaptions";
+
+type Spoken = CheckinPrompt["question"];
+type Bubble = { from: "steady" | "me"; text: string; sub?: string; live?: boolean };
+type Phase = "loading" | "ready" | "recording" | "sending" | "reply";
+
+const MAX_SECONDS = 30;
+const caption = (s: Spoken) => s.text_local ?? s.text_en;
+const steadyBubble = (s: Spoken): Bubble => ({ from: "steady", text: caption(s), sub: s.text_local ? s.text_en : undefined });
 
 export default function Checkin() {
   const navigate = useNavigate();
-
   const [prompt, setPrompt] = useState<CheckinPrompt | null>(null);
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  const [phase, setPhase] = useState<Phase>("loading");
+  const [notice, setNotice] = useState<string | null>(null);
   const [result, setResult] = useState<CheckinResult | null>(null);
+  const [typing, setTyping] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [seconds, setSeconds] = useState(0);
+  const lang = prompt?.question.lang ?? "en";
+  const captions = useLiveCaptions(lang);
 
-  const [loading, setLoading] = useState(true);
-  const [recording, setRecording] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const stream = useRef<MediaStream | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const bottom = useRef<HTMLDivElement>(null);
 
-  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [duration, setDuration] = useState(0);
-
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const startTimeRef = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
+  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [bubbles, captions.text, phase]);
 
   useEffect(() => {
     api
       .checkinPrompt()
-      .then(setPrompt)
-      .catch((err) => setError((err as Error).message))
-      .finally(() => setLoading(false));
-
+      .then((p) => {
+        setPrompt(p);
+        setBubbles([...(p.opener ? [steadyBubble(p.opener)] : []), steadyBubble(p.question)]);
+        setPhase("ready");
+        // Reached by a tap (Home mic or swipe), so audio is allowed: Steady speaks first.
+        void (async () => {
+          if (p.opener) await speak(p.opener);
+          await speak(p.question);
+        })();
+      })
+      .catch((e: Error) => {
+        setNotice(e.message || "Steady can't connect right now.");
+        setPhase("ready");
+      });
     return () => {
       stopSpeaking();
-
-      const recorder = recorderRef.current;
-      if (recorder && recorder.state !== "inactive") {
-        recorder.onstop = null;
-        recorder.stop();
-      }
-
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-
-      if (audioUrlRef.current) {
-        URL.revokeObjectURL(audioUrlRef.current);
-      }
+      window.clearInterval(timer.current);
+      stream.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
-  function playQuestion() {
-    if (!prompt) return;
-
-    audioRef.current?.pause();
-    unlockAudio();
-    void speak(prompt.question);
-  }
-
-  function playReply() {
-    if (!result) return;
-
-    audioRef.current?.pause();
-    unlockAudio();
-    void speak(result.reply);
-  }
-
-  function clearRecording() {
-    audioRef.current?.pause();
-
-    if (audioUrlRef.current) {
-      URL.revokeObjectURL(audioUrlRef.current);
-      audioUrlRef.current = null;
+  const send = async (answer: Blob | string, heard: string) => {
+    setPhase("sending");
+    setNotice(null);
+    try {
+      let r: CheckinResult;
+      try {
+        r = typeof answer === "string" ? await api.submitCheckin({ text: answer }) : await api.submitCheckinAudio(answer);
+      } catch (err) {
+        // The recording came back empty (noisy room, or the phone gave the mic to live captions): use what we heard.
+        if (typeof answer !== "string" && heard) r = await api.submitCheckin({ text: heard });
+        else throw err;
+      }
+      setResult(r);
+      setBubbles((b) => [...b.filter((x) => !x.live), { from: "me", text: r.transcript }, steadyBubble(r.reply)]);
+      setPhase("reply");
+      await speak(r.reply);
+      if (r.tier !== "red") window.setTimeout(() => navigate("/patient"), 4000);
+    } catch (e) {
+      setBubbles((b) => b.filter((x) => !x.live));
+      setNotice((e as Error).message || "Something went wrong. Please try again.");
+      setPhase("ready");
     }
+  };
 
-    setAudioUrl(null);
-    setRecordedAudio(null);
-    setDuration(0);
-  }
-
-  async function startRecording() {
-    setError(null);
+  const startRecording = async () => {
+    setNotice(null);
     stopSpeaking();
-    clearRecording();
-
+    unlockAudio();
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      setError("Voice recording is not supported in this browser.");
+      setNotice("Voice needs the secure (https://) link. You can type your answer instead.");
+      setTyping(true);
       return;
     }
-
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
-
-      streamRef.current = stream;
-
-      const preferredType = [
-        "audio/webm;codecs=opus",
-        "audio/webm",
-        "audio/mp4",
-      ].find((type) => MediaRecorder.isTypeSupported(type));
-
-      const recorder = new MediaRecorder(
-        stream,
-        preferredType ? { mimeType: preferredType } : undefined
-      );
-
-      recorderRef.current = recorder;
-
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.current = s;
+      const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t));
+      const rec = new MediaRecorder(s, type ? { mimeType: type } : undefined);
       const chunks: Blob[] = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      rec.onstop = () => {
+        s.getTracks().forEach((t) => t.stop());
+        window.clearInterval(timer.current);
+        const heard = captions.stop();
+        const audio = new Blob(chunks, { type: rec.mimeType || type || "audio/webm" });
+        if (audio.size > 1000) void send(audio, heard);
+        else if (heard) void send(heard, heard);
+        else {
+          setBubbles((b) => b.filter((x) => !x.live));
+          setNotice("I didn't catch that. Tap and speak again.");
+          setPhase("ready");
         }
       };
-
-      recorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-        setRecording(false);
-
-        const elapsed = (Date.now() - startTimeRef.current) / 1000;
-        setDuration(elapsed);
-
-        const audio = new Blob(chunks, {
-          type: recorder.mimeType,
-        });
-
-        if (audio.size === 0) {
-          setError("No audio was recorded. Please try again.");
-          return;
-        }
-
-        const url = URL.createObjectURL(audio);
-
-        audioUrlRef.current = url;
-        setRecordedAudio(audio);
-        setAudioUrl(url);
-      };
-
-      recorder.onerror = () => {
-        setError("Recording failed. Please try again.");
-        stream.getTracks().forEach((track) => track.stop());
-        setRecording(false);
-      };
-
-      startTimeRef.current = Date.now();
-      recorder.start();
-      setRecording(true);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not access your microphone."
-      );
+      recorder.current = rec;
+      rec.start();
+      captions.start();
+      setSeconds(0);
+      const started = Date.now();
+      timer.current = window.setInterval(() => {
+        const sec = Math.floor((Date.now() - started) / 1000);
+        setSeconds(sec);
+        if (sec >= MAX_SECONDS && rec.state === "recording") rec.stop();
+      }, 250);
+      setBubbles((b) => [...b, { from: "me", text: "", live: true }]);
+      setPhase("recording");
+    } catch {
+      setNotice("Steady needs the microphone. Allow it in the browser, or type your answer instead.");
+      setTyping(true);
     }
-  }
+  };
 
-  function finishRecording() {
-    if (recorderRef.current?.state === "recording") {
-      recorderRef.current.stop();
-    }
-  }
+  const onMic = () => {
+    if (phase === "recording") {
+      if (recorder.current?.state === "recording") recorder.current.stop();
+    } else if (phase === "ready") void startRecording();
+  };
 
-  async function sendRecording() {
-    if (!recordedAudio || submitting) return;
+  const red = result?.tier === "red";
 
-    setSubmitting(true);
-    setError(null);
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <header className="flex items-center justify-between px-5 pt-5 pb-2">
+        <button type="button" onClick={() => navigate("/patient")} className="min-h-12 text-xl font-bold text-indigo">
+          ← Back
+        </button>
+        <p className="text-sm font-bold tracking-widest text-slate-soft uppercase">Talking with Steady</p>
+      </header>
 
-    audioRef.current?.pause();
-
-    try {
-      const data = await api.submitCheckinAudio(recordedAudio);
-      setResult(data);
-      clearRecording();
-      void speak(data.reply); // play Steady's reply right away (the submit tap already unlocked audio)
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  if (loading) {
-    return <p className="p-6 text-xl">Loading check-in...</p>;
-  }
-
-  if (!prompt && !result) {
-    return (
-      <p role="alert" className="p-6 text-xl text-red">
-        {error ?? "No check-in available."}
-      </p>
-    );
-  }
-
-  if (result) {
-    return (
-      <main className="flex min-h-dvh flex-col gap-6 px-5 pb-8 pt-8">
-        <h1 className="text-4xl font-bold">
-          {result.tier === "red" ? "Please get help now" : "Thank you for sharing!"}
-        </h1>
-
-        {/* Red only: the reply tells them to call 911, so give them one tap to do it. Never show tiers otherwise. */}
-        {result.tier === "red" && (
-          <a
-            href="tel:911"
-            className="flex min-h-16 items-center justify-center rounded-2xl bg-red px-6 text-2xl font-bold text-white"
-          >
+      <main className="flex-1 space-y-4 overflow-y-auto px-5 pb-4" aria-live="polite">
+        {phase === "loading" && <p className="text-xl text-slate-soft">Steady is getting ready…</p>}
+        {bubbles.map((b, i) => (
+          <div key={i} className={`flex ${b.from === "me" ? "justify-end" : "justify-start"}`}>
+            <div
+              lang={b.from === "steady" ? lang : undefined}
+              className={`max-w-[85%] rounded-3xl px-5 py-4 text-xl leading-snug shadow-card ${
+                b.from === "me" ? "rounded-br-md bg-indigo text-white" : "rounded-bl-md bg-white text-navy"
+              }`}
+            >
+              {b.live ? (
+                <span className="italic opacity-90">{captions.text || (captions.supported ? "Listening…" : "Listening… (your words will appear when you finish)")}</span>
+              ) : (
+                b.text
+              )}
+              {b.sub && <p className="mt-2 text-base opacity-70">{b.sub}</p>}
+            </div>
+          </div>
+        ))}
+        {phase === "sending" && (
+          <p className="text-center text-lg text-slate-soft" role="status">
+            Steady is listening carefully…
+          </p>
+        )}
+        {red && (
+          <a href="tel:911" className="flex min-h-16 items-center justify-center rounded-2xl bg-red text-2xl font-bold text-white">
             📞 Call 911
           </a>
         )}
-
-        <section className="rounded-3xl bg-white p-6 shadow-card">
-          <h2 className="mb-4 text-xl font-bold text-slate-soft">
-            Steady says
-          </h2>
-
-          <p
-            lang={result.reply.lang}
-            className="text-2xl leading-relaxed"
-          >
-            {result.reply.text_local ?? result.reply.text_en}
-          </p>
-
-          {result.reply.text_local && (
-            <p className="mt-4 text-lg text-slate-soft">
-              {result.reply.text_en}
-            </p>
-          )}
-        </section>
-
-        <button
-          type="button"
-          onClick={playReply}
-          className="min-h-16 rounded-2xl bg-indigo px-6 text-xl font-bold text-white"
-        >
-          🔊 Listen to Steady
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate("/patient")}
-          className="min-h-16 rounded-2xl bg-white px-6 text-xl font-bold text-indigo shadow-card"
-        >
-          Return Home
-        </button>
+        {notice && <p role="alert" className="rounded-2xl bg-amber-light px-4 py-3 text-lg text-amber-dark">{notice}</p>}
+        <div ref={bottom} />
       </main>
-    );
-  }
 
-  if (!prompt) return null;
-
-  return (
-    <main className="flex min-h-dvh flex-col gap-6 px-5 pb-8 pt-8">
-      <button
-        type="button"
-        onClick={() => navigate("/patient")}
-        className="min-h-12 self-start text-xl font-bold text-indigo"
-      >
-        ← Back
-      </button>
-
-      <h1 className="text-4xl font-bold">
-        Daily Check-in
-      </h1>
-
-      {prompt?.opener && (
-        <section className="rounded-3xl bg-white p-6 shadow-card">
-          <h2 className="mb-4 text-xl font-bold text-slate-soft">
-            A little something for you
-          </h2>
-
-          <p
-            lang={prompt.opener.lang}
-            className="text-2xl leading-relaxed"
-          >
-            {prompt.opener.text_local ?? prompt.opener.text_en}
-          </p>
-
-          {prompt.opener.text_local && (
-            <p className="mt-3 text-lg text-slate-soft">
-              {prompt.opener.text_en}
-            </p>
-          )}
-        </section>
-      )}
-
-      <section className="rounded-3xl bg-white p-6 shadow-card">
-        <h2 className="mb-4 text-xl font-bold text-slate-soft">
-          Steady asks
-        </h2>
-
-        <p
-          lang={prompt.question.lang}
-          className="text-3xl font-bold leading-relaxed"
-        >
-          {prompt.question.text_local ?? prompt.question.text_en}
-        </p>
-
-        {prompt.question.text_local && (
-          <p className="mt-3 text-xl text-slate-soft">
-            {prompt.question.text_en}
-          </p>
-        )}
-      </section>
-
-      <button
-        type="button"
-        onClick={playQuestion}
-        disabled={recording || submitting}
-        className="min-h-16 rounded-2xl bg-white px-6 text-xl font-bold text-indigo shadow-card disabled:opacity-50"
-      >
-        🔊 Listen to question
-      </button>
-
-      <section className="rounded-3xl bg-white p-6 text-center shadow-card">
-        <h2 className="mb-5 text-2xl font-bold">
-          Tell Steady how you feel
-        </h2>
-
-        <button
-          type="button"
-          onClick={recording ? finishRecording : startRecording}
-          disabled={submitting}
-          className={`mx-auto flex h-36 w-36 items-center justify-center rounded-full text-6xl text-white shadow-lg disabled:opacity-50 ${
-            recording ? "bg-red-600" : "bg-indigo"
-          }`}
-        >
-          {recording ? "■" : "🎤"}
-        </button>
-
-        <p role="status" className="mt-5 text-xl font-bold">
-          {submitting
-            ? "Sending your response..."
-            : recording
-              ? "Recording... Tap to finish"
-              : recordedAudio
-                ? "Your recording is ready!"
-                : "Tap the microphone to talk"}
-        </p>
-
-        {recordedAudio && !recording && (
-          <div className="mt-6 space-y-5">
-            <p className="text-lg text-slate-soft">
-              Recording length: {duration.toFixed(1)} seconds
-            </p>
-
-            <p className="text-base text-slate-soft">
-              Audio captured: {(recordedAudio.size / 1024).toFixed(1)} KB
-            </p>
-
-            {audioUrl && (
-              <div>
-                <p className="mb-3 text-xl font-bold">
-                  Listen to your recording
-                </p>
-
-                <audio
-                  ref={audioRef}
-                  controls
-                  src={audioUrl}
-                  className="w-full"
-                />
-              </div>
+      <footer className="sticky bottom-0 bg-background px-5 pt-3 pb-8">
+        {phase === "reply" ? (
+          <div className="grid gap-2">
+            {result && (
+              <button type="button" onClick={() => void speak(result.reply)} className="min-h-14 rounded-2xl bg-white text-lg font-bold text-indigo shadow-card">
+                🔊 Hear Steady again
+              </button>
             )}
-
-            <button
-              type="button"
-              onClick={sendRecording}
-              disabled={submitting}
-              className="min-h-16 w-full rounded-2xl bg-indigo px-6 text-xl font-bold text-white disabled:opacity-50"
-            >
-              {submitting ? "Sending..." : "Send to Steady"}
+            {!red && (
+              <button type="button" onClick={() => navigate("/patient")} className="min-h-16 rounded-2xl bg-green text-2xl font-bold text-white">
+                Done
+              </button>
+            )}
+          </div>
+        ) : typing ? (
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!typed.trim()) return;
+              setBubbles((b) => [...b, { from: "me", text: typed.trim(), live: true }]);
+              void send(typed.trim(), typed.trim());
+              setTyped("");
+            }}
+          >
+            <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="How are you feeling?" lang={lang}
+              className="min-h-16 flex-1 rounded-2xl border border-line bg-white px-4 text-xl" disabled={phase !== "ready"} />
+            <button className="min-h-16 rounded-2xl bg-navy px-6 text-xl font-bold text-white" disabled={phase !== "ready"}>
+              Send
             </button>
-
+          </form>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
             <button
               type="button"
-              onClick={clearRecording}
-              disabled={submitting}
-              className="min-h-14 w-full rounded-2xl bg-slate-100 px-6 text-xl font-bold text-slate-800"
+              onClick={onMic}
+              disabled={phase === "loading" || phase === "sending"}
+              aria-label={phase === "recording" ? "Stop and send" : "Tap to talk"}
+              className={`flex size-32 items-center justify-center rounded-full border-8 border-white text-white shadow-card transition disabled:opacity-40 ${
+                phase === "recording" ? "animate-pulse bg-amber" : "bg-navy"
+              }`}
             >
-              Record Again
+              <span className="text-4xl" aria-hidden>{phase === "recording" ? "■" : "🎙"}</span>
+            </button>
+            <p className="text-xl font-bold text-navy">
+              {phase === "recording" ? `Listening… tap to send (${MAX_SECONDS - seconds}s)` : "Tap and tell Steady how you feel"}
+            </p>
+            <button type="button" onClick={() => setTyping(true)} className="min-h-12 text-lg text-indigo underline">
+              Type instead
             </button>
           </div>
         )}
-      </section>
-
-      {error && (
-        <p role="alert" className="text-lg text-red">
-          {error}
-        </p>
-      )}
-    </main>
+      </footer>
+    </div>
   );
 }

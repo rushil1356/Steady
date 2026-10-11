@@ -11,7 +11,7 @@ from app.contracts import (
 )
 from app.db import get_session, sync_meds_to_care_store
 from app.engine.doses import ensure_today
-from app.models import DoseDB, MedicationDB
+from app.models import DoseDB, MedicationDB, ProfileDB
 
 router = APIRouter(prefix="/api")
 
@@ -109,4 +109,20 @@ def reset_clock(session: Session = Depends(get_session)):
     session.commit()
     care_store.reset()
     sync_meds_to_care_store(session)
+    return OkResponse(ok=True)
+
+
+@router.post("/demo/start-fresh", response_model=OkResponse)
+def start_fresh(session: Session = Depends(get_session)):
+    """Wipe everything (profile, medicines, doses, check-ins, alerts) to show setup from scratch on stage."""
+    clock.reset()
+    for row in [*session.exec(select(DoseDB)).all(), *session.exec(select(MedicationDB)).all()]:
+        session.delete(row)
+    profile = session.get(ProfileDB, 1)
+    if profile is not None:
+        session.delete(profile)
+    session.commit()
+    care_store.reset(full=True)
+    session.add(ProfileDB(id=1))
+    session.commit()
     return OkResponse(ok=True)

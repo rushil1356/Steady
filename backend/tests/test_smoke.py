@@ -1,5 +1,5 @@
 
-"""Smoke tests for all 18 Steady API endpoints."""
+"""Smoke tests for all 19 Steady API endpoints."""
 
 import sys
 from datetime import datetime, timezone
@@ -123,6 +123,7 @@ ENDPOINTS = [
     }),
     ("POST", "/api/demo/two-weeks-later", {}),
     ("POST", "/api/demo/reset", {}),
+    ("POST", "/api/demo/start-fresh", {}),
 ]
 
 
@@ -136,7 +137,7 @@ def test_endpoint_returns_200(client, method, path, kwargs):
     assert response.status_code == 200, response.text
 
 
-def test_all_18_endpoints_are_registered():
+def test_all_19_endpoints_are_registered():
     paths = app.openapi()["paths"]
     count = sum(len(methods) for methods in paths.values())
-    assert count == 18
+    assert count == 19

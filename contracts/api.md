@@ -35,6 +35,7 @@ There is one patient and one caregiver per install, and no login (a hackathon de
 | POST | `/api/demo/clock` | `{"time": "20:00"}` | `demo_clock.json` | `DemoClockRequest` → `DemoClockResponse` |
 | POST | `/api/demo/two-weeks-later` | | `ok.json` | `OkResponse` |
 | POST | `/api/demo/reset` | | `ok.json` | `OkResponse` |
+| POST | `/api/demo/start-fresh` | | `ok.json` | `OkResponse` |
 
 `spoken.json` is the shape of every piece of speech (`Spoken`), and `analysis.json` is what `ai.analyze_checkin` returns (`Analysis`).
 
@@ -46,7 +47,7 @@ There is one patient and one caregiver per install, and no login (a hackathon de
 - **Reminder levels** run from 1 (full spoken reminder) to 4 (silent monitoring). Higher means less support.
 - **Dose status** is `"upcoming"`, `"due"`, `"taken"` or `"missed"`. **Calendar status** is `"ontime"`, `"late"` or `"missed"`.
 - **Audio:** `audio_url` is a path under `/static/` (FastAPI serves `backend/static/`), or `null`. When it's `null`, the frontend speaks `text_en` with the phone's own voice.
-- **Profile:** the caregiver fills it in at setup. `patient.preferred_name` is what Steady calls the patient out loud; nothing in the code has a default name. `caregiver.phone` is where alert texts go. `sharing_consent` must be `true` before setup can finish, because alerts are silent: `PUT /api/profile` with `setup_complete: true` and `sharing_consent: false` returns 400. The profile's `patient.language` and `patient.interests` are the same stored values that `PUT /api/patient/language` and `PUT /api/patient/interests` change.
+- **Profile:** a fresh install starts with an empty profile (`setup_complete: false`) and no medicines; the caregiver app opens on Profile and the patient app shows a waiting screen until setup is done. `POST /api/demo/start-fresh` returns to that state; `POST /api/demo/reset` keeps the profile and medicines. The caregiver fills it in at setup. `patient.preferred_name` is what Steady calls the patient out loud; nothing in the code has a default name. `caregiver.phone` is where alert texts go. `sharing_consent` must be `true` before setup can finish, because alerts are silent: `PUT /api/profile` with `setup_complete: true` and `sharing_consent: false` returns 400. The profile's `patient.language` and `patient.interests` are the same stored values that `PUT /api/patient/language` and `PUT /api/patient/interests` change.
 - **No pronouns.** Text about the patient uses the preferred name ("Asha took both evening pills"), never he/she.
 - **Language:** the patient's communication preference is set in the profile (and can be changed on the patient's own phone with `PUT /api/patient/language`), from `/api/languages`. Every `Spoken` carries `lang` (the patient's language code), `text_en`, and `text_local` (the text in that language, or `null` for English). When the language's `spoken` is `false`, the audio is English and `text_local` is the caption.
 - **The closing line the patient hears never mentions the caregiver, alerts or reports.** Alerts go to the caregiver silently. The only exception: a red tier tells the patient to call 911 or get help nearby.

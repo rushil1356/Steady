@@ -37,11 +37,10 @@ def sync_meds_to_care_store(session: Session) -> None:
 
 
 def seed_if_empty() -> None:
-    """First run: the demo profile and the 4 demo medicines (contracts/examples), so every screen works at once."""
-    from sqlmodel import select
-
-    from app import care_store, mocks
-    from app.models import MedicationDB, PatientDB, ProfileDB
+    """First run: the patient row and an (empty) profile row. The caregiver fills in the profile and scans the
+    medicines in the caregiver app."""
+    from app import care_store
+    from app.models import PatientDB, ProfileDB
 
     with Session(engine) as session:
         if session.get(PatientDB, 1) is None:
@@ -55,14 +54,6 @@ def seed_if_empty() -> None:
                 caregiver_relationship=p.caregiver.relationship, caregiver_phone=p.caregiver.phone,
                 sharing_consent=p.sharing_consent, setup_complete=p.setup_complete,
             ))
-        if not session.exec(select(MedicationDB)).first():
-            for m in mocks.load("extracted_meds")["medications"]:
-                session.add(MedicationDB(
-                    id=f"med_{m['name'].lower().replace(' ', '_')}", patient_id=1, name=m["name"],
-                    dose=m.get("dose"), times=m.get("times", []), purpose=m.get("purpose"), look=m.get("look"),
-                    color=m.get("color"), high_risk=m.get("high_risk", False),
-                    always_remind=m.get("high_risk", False),
-                ))
         session.commit()
         sync_meds_to_care_store(session)
 
