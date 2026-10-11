@@ -37,23 +37,27 @@ export default function Checkin() {
   useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [bubbles, captions.text, phase]);
 
   useEffect(() => {
+    let alive = true; // React runs this twice in development; only the live run may speak
     api
       .checkinPrompt()
       .then((p) => {
+        if (!alive) return;
         setPrompt(p);
         setBubbles([...(p.opener ? [steadyBubble(p.opener)] : []), steadyBubble(p.question)]);
         setPhase("ready");
         // Reached by a tap (Home mic or swipe), so audio is allowed: Steady speaks first.
         void (async () => {
           if (p.opener) await speak(p.opener);
-          await speak(p.question);
+          if (alive) await speak(p.question);
         })();
       })
       .catch((e: Error) => {
+        if (!alive) return;
         setNotice(e.message || "Steady can't connect right now.");
         setPhase("ready");
       });
     return () => {
+      alive = false;
       stopSpeaking();
       window.clearInterval(timer.current);
       stream.current?.getTracks().forEach((t) => t.stop());
