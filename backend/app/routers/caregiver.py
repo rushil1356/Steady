@@ -37,7 +37,7 @@ def dashboard():
         "status": Status(tier=tier, headline=HEADLINES[tier],
                          updated_at=updated or care_store.now().isoformat(timespec="seconds")),
         "active_alert": to_active(alert) if alert else None,
-        "checkins": [_row(c) for c in reversed(real)] + seeded.checkins,
+        "checkins": [_row(c) for c in reversed(real)],   # the store already holds the seeded earlier check-in
         "mood_14d": mood[-14:],
         "interests": care_store.profile().patient.interests,
     })
