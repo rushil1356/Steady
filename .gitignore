@@ -37,3 +37,9 @@ backend/tests/fixtures/labels/*.heic
 
 # the care record (profile, check-ins, alerts) written at runtime
 backend/data/
+
+# local test files
+backend/recordings/
+backend/try_*.py
+backend/tests/fixtures/labels/expected.json
+*.patch
