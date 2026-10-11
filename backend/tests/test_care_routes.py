@@ -39,7 +39,7 @@ def test_language_change_updates_profile():
 
 def test_checkin_text_creates_checkin_alert_and_shows_on_dashboard():
     before = client.get("/api/alerts/latest").json()
-    assert before["alert"] is None and before["latest_checkin_id"] is None
+    assert before["alert"] is None and before["latest_checkin_id"] == 900      # the seeded earlier check-in
 
     r = client.post("/api/checkins", json={"text": "I feel dizzy again"})
     assert r.status_code == 200
@@ -87,3 +87,15 @@ def test_scheduling_engine_hook():
 
     care_store.set_meds([MedBrief(id="med_x", name="Lisinopril")])
     assert [m.name for m in care_store.meds()] == ["Lisinopril"]
+
+
+def test_seeded_history_makes_dizziness_a_repeat():
+    from app.ai.analyze import rules_analysis
+
+    a = rules_analysis("I feel dizzy again", care_store.meds(), care_store.history(), "Asha")
+    assert a.suggested_tier == "yellow"
+
+
+def test_docs_show_checkin_body():
+    body = app.openapi()["paths"]["/api/checkins"]["post"]["requestBody"]["content"]
+    assert "application/json" in body and "multipart/form-data" in body
