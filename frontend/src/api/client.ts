@@ -66,4 +66,7 @@ export const api = {
     request<DoseConfirm>(`/api/doses/${doseId}/confirm`, json({ prompted })),
   submitCheckin: (body: CheckinTextBody) =>
   request<CheckinResult>("/api/checkins", json(body)),
+
+caregiverDashboard: () =>
+  request<components["schemas"]["Dashboard"]>("/api/caregiver/dashboard"),
 };

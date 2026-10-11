@@ -21,8 +21,12 @@ export default function Language() {
     setSaving(true);
     try {
       await api.setLanguage(code);
-      setCurrent(code);
-      navigate("/patient");
+
+localStorage.setItem("steady-language", code);
+window.dispatchEvent(new Event("steady-language-change"));
+
+setCurrent(code);
+navigate("/patient");
     } finally {
       setSaving(false);
     }
