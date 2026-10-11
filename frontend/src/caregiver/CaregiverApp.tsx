@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import Alerts from "./Alerts";
+import Scan from "./Scan";
 
 const TABS = [
   ["profile", "Profile"],
@@ -23,7 +25,7 @@ export default function CaregiverApp() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-[440px] flex-col">
       <main className="flex-1 p-6">
-        <h1 className="text-3xl">Caregiver: {tab}</h1>
+        {tab === "alerts" ? <Alerts /> : tab === "scan" ? <Scan /> : <h1 className="text-3xl">Caregiver: {tab}</h1>}
       </main>
       <nav aria-label="Main" className="sticky bottom-0 grid grid-cols-4 border-t border-line bg-white">
         {TABS.map(([id, label]) => (
