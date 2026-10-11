@@ -6,15 +6,25 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import SplashScreen from "./components/SplashScreen";
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  // Show the splash once per browser tab, not on every reload (a reload during the demo shouldn't cost 4 seconds).
+  const [showSplash, setShowSplash] = useState(() => {
+    try {
+      if (sessionStorage.getItem("steady.splash") === "1") return false;
+      sessionStorage.setItem("steady.splash", "1");
+    } catch {
+      /* storage blocked: just show it */
+    }
+    return true;
+  });
 
   useEffect(() => {
+    if (!showSplash) return;
     const timer = window.setTimeout(() => {
       setShowSplash(false);
     }, 4000);
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [showSplash]);
 
   return (
     <ErrorBoundary>
