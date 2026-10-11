@@ -126,3 +126,10 @@ def start_fresh(session: Session = Depends(get_session)):
     session.add(ProfileDB(id=1))
     session.commit()
     return OkResponse(ok=True)
+
+
+@router.post("/demo/load-sample", response_model=OkResponse)
+def load_sample():
+    """Demo only: fill the caregiver dashboard with the example history (14 days of check-ins, adherence charts)."""
+    care_store.load_sample_history()
+    return OkResponse(ok=True)

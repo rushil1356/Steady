@@ -207,19 +207,19 @@ function MoodTrendChart({ data, name }: { data: Dashboard; name: string }) {
               >
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="#e2e8f0"
+                  stroke="#e6dfcf"
                 />
 
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 12, fill: "#64748b" }}
+                  tick={{ fontSize: 12, fill: "#55706d" }}
                   tickLine={false}
                 />
 
                 <YAxis
                   domain={[0, 10]}
                   ticks={[0, 2, 4, 6, 8, 10]}
-                  tick={{ fontSize: 12, fill: "#64748b" }}
+                  tick={{ fontSize: 12, fill: "#55706d" }}
                   tickLine={false}
                 />
 
@@ -231,11 +231,11 @@ function MoodTrendChart({ data, name }: { data: Dashboard; name: string }) {
                 <Line
                   type="monotone"
                   dataKey="score"
-                  stroke="#312e81"
+                  stroke="#0e6b63"
                   strokeWidth={3}
                   dot={{
                     r: 4,
-                    fill: "#312e81",
+                    fill: "#0e6b63",
                     strokeWidth: 2,
                     stroke: "#ffffff",
                   }}
@@ -351,7 +351,7 @@ function MedicationIndependence({ data }: { data: Dashboard }) {
                 <Bar
                   dataKey="doses"
                   name="Unprompted doses"
-                  fill="#312e81"
+                  fill="#0e6b63"
                   radius={[6, 6, 0, 0]}
                   maxBarSize={55}
                 />
@@ -465,9 +465,9 @@ function TodayDashboard({ data, name }: { data: Dashboard; name: string }) {
           <div className="cg-card">
             <p className="cg-stat-label">On-time adherence</p>
             <p className="cg-stat-value">
-              {kpis.on_time_pct_30d}%
+              {kpis.doses_30d > 0 ? `${kpis.on_time_pct_30d}%` : "—"}
             </p>
-            <p className="cg-feed-note">Last 30 days</p>
+            <p className="cg-feed-note">{kpis.doses_30d > 0 ? "Last 30 days" : "Builds up as doses are taken"}</p>
           </div>
 
           <div className="cg-card">

@@ -124,6 +124,7 @@ ENDPOINTS = [
     ("POST", "/api/demo/two-weeks-later", {}),
     ("POST", "/api/demo/reset", {}),
     ("POST", "/api/demo/start-fresh", {}),
+    ("POST", "/api/demo/load-sample", {}),
 ]
 
 
@@ -137,7 +138,7 @@ def test_endpoint_returns_200(client, method, path, kwargs):
     assert response.status_code == 200, response.text
 
 
-def test_all_19_endpoints_are_registered():
+def test_all_20_endpoints_are_registered():
     paths = app.openapi()["paths"]
     count = sum(len(methods) for methods in paths.values())
-    assert count == 19
+    assert count == 20
