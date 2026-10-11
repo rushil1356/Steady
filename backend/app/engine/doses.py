@@ -63,7 +63,15 @@ def ensure_today(session: Session, now: datetime | None = None):
             continue
 
         if now >= dose.scheduled_at + timedelta(hours=2):
+            newly_missed = dose.status != "missed"
             dose.status = "missed"
+            if newly_missed and clock._demo_time is None:  # demo jumps shouldn't punish the fading level
+                session.add(dose)
+                med = session.get(MedicationDB, dose.medication_id)
+                if med is not None:
+                    from app.engine.fading import missed_dose
+
+                    missed_dose(session, med)
 
         elif now >= dose.scheduled_at:
             dose.status = "due"
