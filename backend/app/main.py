@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.db import init_db
 from app.routers import alerts, caregiver, checkins, demo, doses, meds, patient, profile, setup
 
 app = FastAPI(title="Steady")
@@ -29,3 +30,6 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # Every router is registered now, so nobody has to edit this file later.
 for module in (profile, setup, patient, meds, doses, checkins, caregiver, alerts, demo):
     app.include_router(module.router)
+
+# Create the SQLite tables and seed the demo schedule on first run.
+init_db()
